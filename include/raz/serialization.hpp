@@ -36,18 +36,18 @@ namespace raz
 		}
 	};
 
-	class ISerializer
+	struct SerializerTag
 	{
-	public:
-		enum Mode
-		{
-			SERIALIZE,
-			DESERIALIZE
-		};
+	};
+
+	enum SerializationMode
+	{
+		SERIALIZE,
+		DESERIALIZE
 	};
 
 	template<class BufferType, bool EndiannessConversion = false>
-	class Serializer : public ISerializer
+	class Serializer : public SerializerTag
 	{
 	public:
 		template<class... Args>
@@ -55,7 +55,7 @@ namespace raz
 		{
 		}
 
-		Mode getMode() const
+		SerializationMode getMode() const
 		{
 			return m_buffer.getMode();
 		}
@@ -63,7 +63,7 @@ namespace raz
 		template<class I, class = std::enable_if_t<std::is_integral<I>::value>>
 		Serializer& operator()(I& i)
 		{
-			if (getMode() == Mode::SERIALIZE)
+			if (getMode() == SerializationMode::SERIALIZE)
 			{
 				I tmp = i;
 
@@ -91,7 +91,7 @@ namespace raz
 
 		Serializer& operator()(float& f)
 		{
-			if (getMode() == Mode::SERIALIZE)
+			if (getMode() == SerializationMode::SERIALIZE)
 			{
 				uint32_t tmp = static_cast<uint32_t>(pack754_32(f));
 				(*this)(tmp);
@@ -108,7 +108,7 @@ namespace raz
 
 		Serializer& operator()(double& d)
 		{
-			if (getMode() == Mode::SERIALIZE)
+			if (getMode() == SerializationMode::SERIALIZE)
 			{
 				uint64_t tmp = pack754_32(d);
 				(*this)(tmp);
@@ -125,7 +125,7 @@ namespace raz
 
 		Serializer& operator()(std::string& str)
 		{
-			if (getMode() == Mode::SERIALIZE)
+			if (getMode() == SerializationMode::SERIALIZE)
 			{
 				uint32_t len = static_cast<uint32_t>(str.length());
 				(*this)(len);
@@ -188,9 +188,9 @@ namespace raz
 	//template<class T>
 	//class IsSerializer
 	//{
-	//	using value = std::is_base_of<ISerializer, T>::value;
+	//	using value = std::is_base_of<SerializerTag, T>::value;
 	//};
 
 	template<class T>
-	using EnableSerializer = std::enable_if_t<std::is_base_of<ISerializer, T>::value, T>;
+	using EnableSerializer = std::enable_if_t<std::is_base_of<SerializerTag, T>::value, T>;
 }

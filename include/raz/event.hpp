@@ -27,22 +27,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 namespace raz
 {
-	class IEvent
-	{
-	public:
-		typedef uint32_t Type;
+	typedef uint32_t EventType;
 
-		template<unsigned N, class T>
-		class Tag
-		{
-		public:
-			static const unsigned Param = N;
-			typedef T Type;
-		};
+	template<unsigned N, class T>
+	struct EventParamTag
+	{
+		static const unsigned Param = N;
+		typedef T Type;
 	};
 
-	template<IEvent::Type EventType, class... Params>
-	class Event : public Storage<Params...>, public IEvent
+	template<EventType Type, class... Params>
+	class Event : public Storage<Params...>
 	{
 	public:
 		template<class _, class Serializer = EnableSerializer<_>>
@@ -56,9 +51,9 @@ namespace raz
 		{
 		}
 
-		Type getType()
+		EventType getType()
 		{
-			return EventType;
+			return Type;
 		}
 
 		template<class Tag>
@@ -76,12 +71,12 @@ namespace raz
 		template<class _, class Serializer = EnableSerializer<_>>
 		void operator()(Serializer& s)
 		{
-			serialize<0, Types...>(s, *this);
+			serialize<0, Params...>(s, *this);
 		}
 
-		friend constexpr Type operator"" _event(const char* evt, size_t)
+		friend constexpr EventType operator"" _event(const char* evt, size_t)
 		{
-			return (Type)stringhash(evt);
+			return (EventType)stringhash(evt);
 		}
 
 	private:
