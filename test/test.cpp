@@ -19,6 +19,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 */
 
+#include "raz/callback.hpp"
 #include "raz/event.hpp"
 #include "raz/functional.hpp"
 #include "raz/ieee754.hpp"

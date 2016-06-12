@@ -123,6 +123,7 @@
     <ClCompile Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\raz\callback.hpp" />
     <ClInclude Include="..\include\raz\event.hpp" />
     <ClInclude Include="..\include\raz\functional.hpp" />
     <ClInclude Include="..\include\raz\ieee754.hpp" />
