@@ -22,6 +22,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #pragma once
 
 #include <cstdint>
+#include "raz/callback.hpp"
 #include "raz/serialization.hpp"
 #include "raz/storage.hpp"
 
@@ -40,6 +41,9 @@ namespace raz
 	class Event : public Storage<Params...>
 	{
 	public:
+		typedef Callback<Event> Callback;
+		typedef CallbackSystem<Event> CallbackSystem;
+
 		template<class _, class Serializer = EnableSerializer<_>>
 		Event(Serializer& s)
 		{
