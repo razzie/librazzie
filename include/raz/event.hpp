@@ -22,60 +22,100 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #pragma once
 
 #include <cstdint>
+#include <tuple>
 #include "raz/callback.hpp"
 #include "raz/serialization.hpp"
-#include "raz/storage.hpp"
 
 namespace raz
 {
 	typedef uint32_t EventType;
 
-	template<unsigned N, class T>
-	struct EventParamTag
+	template<unsigned N>
+	struct EventNamedParam
 	{
-		static const unsigned Param = N;
-		typedef T Type;
+		static const unsigned ParamNumber = N;
 	};
 
 	template<EventType Type, class... Params>
-	class Event : public Storage<Params...>
+	class Event : public std::tuple<Params...>
 	{
 	public:
 		typedef Callback<Event> Callback;
-		typedef CallbackSystem<Event> CallbackSystem;
+		
+		class CallbackSystem : public raz::CallbackSystem<Event>
+		{
+		public:
+			static EventType getEventType()
+			{
+				return Event::getType();
+			}
+
+			template<class Serializer>
+			void handleSerialized(Serializer& s) const
+			{
+				Event e(s);
+				(*this)(e);
+			}
+		};
 
 		template<class _, class Serializer = EnableSerializer<_>>
-		Event(Serializer& s)
+		Event(Serializer& s) : std::tuple()
 		{
 			if (s.getMode() == ISerializer::Mode::DESERIALIZE)
-				(*this)(s);
+				serialize(s);
+			else
+				throw SerializationError();
 		}
 
-		Event(Params... params) : Storage(std::forward<Params>(params)...)
+		Event(Params... params) : std::tuple(std::forward<Params>(params)...)
 		{
 		}
 
-		EventType getType()
+		static EventType getType()
 		{
 			return Type;
 		}
 
-		template<class Tag>
-		const typename Tag::Type& get(Tag tag = {})
+		template<size_t N>
+		auto get() -> decltype(std::get<N>(*this))
 		{
-			return get<typename Tag::Type>(Tag::Param);
+			return std::get<N>(*this);
 		}
 
-		template<class Tag>
-		void get(const Tag*& tag)
+		template<size_t N>
+		auto get() const -> decltype(std::get<N>(*this))
 		{
-			tag = &get<typename Tag::Type>(Tag::Param);
+			return std::get<N>(*this);
+		}
+
+		template<class NamedParam, size_t N = NamedParam::ParamNumber>
+		auto get() -> decltype(std::get<N>(*this))
+		{
+			return std::get<N>(*this);
+		}
+
+		template<class NamedParam, size_t N = NamedParam::ParamNumber>
+		auto get() const -> decltype(std::get<N>(*this))
+		{
+			return std::get<N>(*this);
+		}
+
+		template<class NamedParam, size_t N = NamedParam::ParamNumber>
+		void get(NamedParam*& tag)
+		{
+			tag = &get<N>();
+		}
+
+		template<class NamedParam, size_t N = NamedParam::ParamNumber>
+		void get(const NamedParam*& tag) const
+		{
+			tag = &get<N>();
 		}
 
 		template<class _, class Serializer = EnableSerializer<_>>
 		void operator()(Serializer& s)
 		{
-			serialize<0, Params...>(s, *this);
+			serialize(s);
 		}
 
 		friend constexpr EventType operator"" _event(const char* evt, size_t)
@@ -84,21 +124,51 @@ namespace raz
 		}
 
 	private:
-		template<class Serializer, size_t N>
+		template<class Serializer, size_t N = 0>
 		void serialize(Serializer& s)
 		{
-		}
-
-		template<class Serializer, size_t N, class Type0, class... Types>
-		void serialize(Serializer& s)
-		{
-			s(get<Type0>(N));
-			serialize<N + 1, Types...>(packet);
+			s(get<N>());
+			if (N < sizeof...(Params)) serialize<Serializer, N + 1>(s);
 		}
 
 		static constexpr uint64_t stringhash(const char* str, const uint64_t h = 5381)
 		{
 			return (str[0] == 0) ? h : stringhash(&str[1], h * 33 + str[0]);
 		}
+	};
+
+	template<class... Events>
+	class EventDispatcher // must always live longer than the given event callback systems
+	{
+	public:
+		EventDispatcher(const typename Events::CallbackSystem&... callback_system) :
+			m_callback_systems((&callback_system)...)
+		{
+		}
+
+		template<class Event, size_t N = 0>
+		void handle(const Event& e) const
+		{
+			auto s = std::get<N>(m_callback_systems);
+			if (s->getEventType() == e.getType())
+				s->handle(e);
+
+			if (N < sizeof...(Events))
+				handle<Event, N + 1>(e);
+		}
+
+		template<class Serializer, size_t N = 0>
+		void handleSerialized(EventType type, Serializer& s) const
+		{
+			auto s = std::get<N>(m_callback_systems);
+			if (s->getEventType() == type)
+				s->handleSerialized<Serializer>(s);
+
+			if (N < sizeof...(Events))
+				handleSerialized<Serializer, N + 1>(type, s);
+		}
+
+	private:
+		std::tuple<const typename Events::CallbackSystem*...> m_callback_systems;
 	};
 }
