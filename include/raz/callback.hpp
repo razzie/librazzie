@@ -47,7 +47,7 @@ namespace raz
 			m_system->unbind(this);
 		}
 
-		void operator()(const T& t)
+		void handle(const T& t) const
 		{
 			m_handler(this, t);
 		}
@@ -61,17 +61,17 @@ namespace raz
 	class CallbackSystem // must always live longer than the bound callbacks
 	{
 	public:
-		void operator()(const T& t) // a callback that deletes itself here causes deadlock
+		void handle(const T& t) const // a callback that deletes itself here causes deadlock
 		{
 			std::lock_guard<decltype(m_lock)> guard(m_lock);
 			for (auto callback : m_callbacks)
 			{
-				(*callback)(t);
+				callback->handle(t);
 			}
 		}
 
 	private:
-		std::mutex m_lock;
+		mutable std::mutex m_lock;
 		std::vector<Callback<T>*> m_callbacks;
 
 		friend class Callback<T>;
