@@ -28,16 +28,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 namespace raz
 {
+	namespace detail
+	{
+		struct SerializerTag
+		{
+		};
+	}
+
 	class SerializationError : public std::exception
 	{
 	public:
-		SerializationError() : exception("Serialization error")
+		virtual const char* what() const
 		{
+			return "Serialization error";
 		}
-	};
-
-	struct SerializerTag
-	{
 	};
 
 	enum SerializationMode
@@ -47,17 +51,17 @@ namespace raz
 	};
 
 	template<class BufferType, bool EndiannessConversion = false>
-	class Serializer : public SerializerTag
+	class Serializer : public BufferType, public detail::SerializerTag
 	{
 	public:
 		template<class... Args>
-		Serializer(Args... args) : m_buffer(std::forward<Args>(args)...)
+		Serializer(Args... args) : BufferType(std::forward<Args>(args)...)
 		{
 		}
 
 		SerializationMode getMode() const
 		{
-			return m_buffer.getMode();
+			return BufferType::getMode();
 		}
 
 		template<class I, class = std::enable_if_t<std::is_integral<I>::value>>
@@ -70,14 +74,14 @@ namespace raz
 				if (EndiannessConversion && !isBigEndian())
 					tmp = swapEndianness(tmp);
 
-				if (m_buffer.write(reinterpret_cast<const char*>(&tmp), sizeof(I)) < sizeof(I))
+				if (BufferType::write(reinterpret_cast<const char*>(&tmp), sizeof(I)) < sizeof(I))
 					throw SerializationError();
 			}
 			else
 			{
 				I tmp;
 
-				if (m_buffer.read(reinterpret_cast<char*>(&tmp), sizeof(I)) < sizeof(I))
+				if (BufferType::read(reinterpret_cast<char*>(&tmp), sizeof(I)) < sizeof(I))
 					throw SerializationError();
 
 				if (EndiannessConversion && !isBigEndian())
@@ -130,7 +134,7 @@ namespace raz
 				uint32_t len = static_cast<uint32_t>(str.length());
 				(*this)(len);
 
-				if (write(str.c_str(), len) < len)
+				if (BufferType::write(str.c_str(), len) < len)
 					throw SerializationError();
 			}
 			else
@@ -139,7 +143,7 @@ namespace raz
 				(*this)(len);
 
 				str.resize(len);
-				if (read(&str[0], len) < len)
+				if (BufferType::read(&str[0], len) < len)
 					throw SerializationError();
 			}
 
@@ -154,8 +158,6 @@ namespace raz
 		}
 
 	private:
-		BufferType m_buffer;
-
 		static constexpr bool isBigEndian()
 		{
 			union
@@ -188,9 +190,9 @@ namespace raz
 	//template<class T>
 	//class IsSerializer
 	//{
-	//	using value = std::is_base_of<SerializerTag, T>::value;
+	//	using value = std::is_base_of<detail::SerializerTag, T>::value;
 	//};
 
 	template<class T>
-	using EnableSerializer = std::enable_if_t<std::is_base_of<SerializerTag, T>::value, T>;
+	using EnableSerializer = std::enable_if_t<std::is_base_of<detail::SerializerTag, T>::value, T>;
 }
