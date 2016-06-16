@@ -59,7 +59,7 @@ namespace raz
 		};
 
 		template<class _, class Serializer = EnableSerializer<_>>
-		Event(Serializer& s) : std::tuple()
+		Event(Serializer& s) : std::tuple<Params...>()
 		{
 			if (s.getMode() == ISerializer::Mode::DESERIALIZE)
 				serialize(s);
@@ -67,7 +67,7 @@ namespace raz
 				throw SerializationError();
 		}
 
-		Event(Params... params) : std::tuple(std::forward<Params>(params)...)
+		Event(Params... params) : std::tuple<Params...>(std::forward<Params>(params)...)
 		{
 		}
 
@@ -149,9 +149,9 @@ namespace raz
 		template<class Event, size_t N = 0>
 		void handle(const Event& e) const
 		{
-			auto s = std::get<N>(m_callback_systems);
-			if (s->getEventType() == e.getType())
-				s->handle(e);
+			auto cb = std::get<N>(m_callback_systems);
+			if (cb->getEventType() == e.getType())
+				cb->handle(e);
 
 			if (N < sizeof...(Events))
 				handle<Event, N + 1>(e);
@@ -160,9 +160,9 @@ namespace raz
 		template<class Serializer, size_t N = 0>
 		void handleSerialized(EventType type, Serializer& s) const
 		{
-			auto s = std::get<N>(m_callback_systems);
-			if (s->getEventType() == type)
-				s->handleSerialized<Serializer>(s);
+			auto cb = std::get<N>(m_callback_systems);
+			if (cb->getEventType() == type)
+				cb->handleSerialized<Serializer>(s);
 
 			if (N < sizeof...(Events))
 				handleSerialized<Serializer, N + 1>(type, s);
