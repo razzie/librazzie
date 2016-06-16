@@ -127,6 +127,7 @@
     <ClInclude Include="..\include\raz\event.hpp" />
     <ClInclude Include="..\include\raz\functional.hpp" />
     <ClInclude Include="..\include\raz\ieee754.hpp" />
+    <ClInclude Include="..\include\raz\network.hpp" />
     <ClInclude Include="..\include\raz\serialization.hpp" />
     <ClInclude Include="..\include\raz\storage.hpp" />
     <ClInclude Include="..\include\raz\stream.hpp" />

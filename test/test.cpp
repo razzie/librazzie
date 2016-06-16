@@ -23,6 +23,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include "raz/event.hpp"
 #include "raz/functional.hpp"
 #include "raz/ieee754.hpp"
+#include "raz/network.hpp"
 #include "raz/serialization.hpp"
 #include "raz/stream.hpp"
 #include "raz/storage.hpp"
