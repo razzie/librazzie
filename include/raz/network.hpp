@@ -31,11 +31,12 @@ namespace raz
 {
 	typedef uint32_t PacketType;
 
-	template<SerializationMode MODE, size_t SIZE>
+	template<size_t SIZE>
 	class PacketBuffer
 	{
 	public:
-		PacketBuffer() :
+		PacketBuffer(SerializationMode mode) :
+			m_mode(mode),
 			m_data_len(0),
 			m_data_pos(0)
 		{
@@ -43,43 +44,12 @@ namespace raz
 
 		SerializationMode getMode() const
 		{
-			return MODE;
+			return m_mode;
 		}
 
-		size_t getSize() const
+		void setMode(SerializationMode mode)
 		{
-			m_data_len;
-		}
-
-		static size_t getCapacity()
-		{
-			return SIZE;
-		}
-
-		size_t write(const char* ptr, size_t len)
-		{
-			if (getMode() != Mode::SERIALIZE)
-				throw SerializationError();
-
-			if (BUF_SIZE - m_data_len < len)
-				len = BUF_SIZE - m_data_len;
-
-			std::memcpy(&m_data[m_data_len], ptr, len);
-			m_data_len += len;
-			return len;
-		}
-
-		size_t read(char* ptr, size_t len)
-		{
-			if (getMode() != Mode::DESERIALIZE)
-				throw SerializationError();
-
-			if (m_data_len - m_data_pos < len)
-				len = m_data_len - m_data_pos;
-
-			std::memcpy(ptr, &m_data[m_data_pos], len);
-			m_data_pos += len;
-			return len;
+			m_mode = mode;
 		}
 
 		char* getData()
@@ -92,16 +62,69 @@ namespace raz
 			return m_data;
 		}
 
+		char* getRemainingData()
+		{
+			return &m_data[m_data_pos];
+		}
+
+		const char* getRemainingData() const
+		{
+			return &m_data[m_data_pos];
+		}
+
+		size_t getRemainingDataLength() const
+		{
+			m_data_len - m_data_pos;
+		}
+
+		size_t getDataLength() const
+		{
+			m_data_len;
+		}
+
+		void setDataLength(size_t len)
+		{
+			m_data_len = len;
+			if (m_data_pos > m_data_len)
+				m_data_pos = m_data_len;
+		}
+
+		static size_t getCapacity()
+		{
+			return SIZE;
+		}
+
+		size_t write(const char* ptr, size_t len)
+		{
+			if (SIZE - m_data_len < len)
+				len = SIZE - m_data_len;
+
+			std::memcpy(&m_data[m_data_len], ptr, len);
+			m_data_len += len;
+			return len;
+		}
+
+		size_t read(char* ptr, size_t len)
+		{
+			if (m_data_len - m_data_pos < len)
+				len = m_data_len - m_data_pos;
+
+			std::memcpy(ptr, &m_data[m_data_pos], len);
+			m_data_pos += len;
+			return len;
+		}
+
 	private:
 		char m_data[SIZE];
+		SerializationMode m_mode;
 		size_t m_data_len;
 		size_t m_data_pos;
 	};
 
 	typedef uint32_t PacketType;
 
-	template<SerializationMode MODE, size_t SIZE = 4096>
-	class Packet : public Serializer<PacketBuffer<MODE, SIZE>>
+	template<size_t SIZE = 4096>
+	class Packet : public Serializer<PacketBuffer<SIZE>>
 	{
 	public:
 		struct Head
@@ -116,7 +139,14 @@ namespace raz
 			bool ok() { return n == 0; }
 		};
 
-		Packet(PacketType type) :
+		Packet() :
+			Serializer<PacketBuffer<SIZE>>(SerializationMode::DESERIALIZE),
+			m_type(0)
+		{
+		}
+
+		Packet(PacketType type, SerializationMode mode) :
+			Serializer<PacketBuffer<SIZE>>(mode),
 			m_type(type)
 		{
 		}
@@ -126,26 +156,19 @@ namespace raz
 			return m_type;
 		}
 
+		void setType(PacketType type)
+		{
+			m_type = type;
+		}
+
 	private:
 		PacketType m_type;
 	};
 
-	template<size_t SIZE>
-	using ReadablePacket = Packet<SerializationMode::DESERIALIZE, SIZE>;
-	template<size_t SIZE>
-	using WritablePacket = Packet<SerializationMode::SERIALIZE, SIZE>;
-
 	template<class CLIENT, size_t SIZE>
-	struct NetworkReadData
+	struct NetworkData
 	{
 		CLIENT client;
-		ReadablePacket<SIZE> packet;
-	};
-
-	template<class CLIENT, size_t SIZE>
-	struct NetworkWriteData
-	{
-		CLIENT client;
-		WritablePacket<SIZE> packet;
+		Packet<SIZE> packet;
 	};
 }
