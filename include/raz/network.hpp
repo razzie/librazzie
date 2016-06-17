@@ -121,8 +121,6 @@ namespace raz
 		size_t m_data_pos;
 	};
 
-	typedef uint32_t PacketType;
-
 	template<size_t SIZE = 4096>
 	class Packet : public Serializer<PacketBuffer<SIZE>>
 	{

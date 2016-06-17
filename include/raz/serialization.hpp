@@ -28,13 +28,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 namespace raz
 {
-	namespace detail
-	{
-		struct SerializerTag
-		{
-		};
-	}
-
 	class SerializationError : public std::exception
 	{
 	public:
@@ -51,7 +44,7 @@ namespace raz
 	};
 
 	template<class BufferType, bool EndiannessConversion = false>
-	class Serializer : public BufferType, public detail::SerializerTag
+	class Serializer : public BufferType
 	{
 	public:
 		template<class... Args>
@@ -64,8 +57,9 @@ namespace raz
 			return BufferType::getMode();
 		}
 
-		template<class I, class = std::enable_if_t<std::is_integral<I>::value>>
-		Serializer& operator()(I& i)
+		template<class I>
+		typename std::enable_if_t<std::is_integral<I>::value, Serializer>&
+			operator()(I& i)
 		{
 			if (getMode() == SerializationMode::SERIALIZE)
 			{
@@ -150,8 +144,24 @@ namespace raz
 			return *this;
 		}
 
+		//template<class T>
+		//class IsSerializable
+		//{
+		//	template<class C, class = decltype(std::declval<C>()(Serializer&))>
+		//	static std::true_type test(int);
+
+		//	template<class C>
+		//	static std::false_type test(...);
+
+		//public:
+		//	static constexpr bool value = decltype(test<T>(0))::value;
+		//};
+
+		//template<class T>
+		//using EnableSerializable = typename std::enable_if_t<IsSerializable<T>::value, Serializer>;
+
 		template<class T>
-		Serializer& operator()(T& t)
+		typename std::enable_if_t<!std::is_integral<T>::value, Serializer>& operator()(T& t)
 		{
 			t(*this);
 			return *this;
@@ -183,16 +193,22 @@ namespace raz
 			for (size_t i = 0; i < sizeof(T); i++)
 				dest.t8[i] = source.t8[sizeof(T) - i - 1];
 
-			return dest.u;
+			return dest.t;
 		}
 	};
 
-	//template<class T>
-	//class IsSerializer
-	//{
-	//	using value = std::is_base_of<detail::SerializerTag, T>::value;
-	//};
-
 	template<class T>
-	using EnableSerializer = std::enable_if_t<std::is_base_of<detail::SerializerTag, T>::value, T>;
+	class IsSerializer
+	{
+		template <typename U>
+		static std::true_type test(Serializer<U> const &);
+
+		static std::false_type test(...);
+
+	public:
+		static bool const value = decltype(test(std::declval<T>()))::value;
+	};
+
+	template<class Serializer, class T = void>
+	using EnableSerializer = std::enable_if_t<IsSerializer<Serializer>::value, T>;
 }

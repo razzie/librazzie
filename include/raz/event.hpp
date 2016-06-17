@@ -51,7 +51,7 @@ namespace raz
 			}
 
 			template<class Serializer>
-			void handleSerialized(Serializer& s) const
+			void handleSerialized(Serializer& s)
 			{
 				Event e(s);
 				(*this)(e);
@@ -118,11 +118,6 @@ namespace raz
 			serialize(s);
 		}
 
-		friend constexpr EventType operator"" _event(const char* evt, size_t)
-		{
-			return (EventType)stringhash(evt);
-		}
-
 	private:
 		template<class Serializer, size_t N = 0>
 		void serialize(Serializer& s)
@@ -130,15 +125,23 @@ namespace raz
 			s(get<N>());
 			if (N < sizeof...(Params)) serialize<Serializer, N + 1>(s);
 		}
+	};
 
+	namespace literal
+	{
 		static constexpr uint64_t stringhash(const char* str, const uint64_t h = 5381)
 		{
 			return (str[0] == 0) ? h : stringhash(&str[1], h * 33 + str[0]);
 		}
-	};
+
+		constexpr EventType operator"" _event(const char* evt, size_t)
+		{
+			return (EventType)stringhash(evt);
+		}
+	}
 
 	template<class... Events>
-	class EventDispatcher // must always live longer than the given event callback systems
+	class EventDispatcher // the given event callback systems must always live longer
 	{
 	public:
 		EventDispatcher(const typename Events::CallbackSystem&... callback_system) :
@@ -146,29 +149,56 @@ namespace raz
 		{
 		}
 
-		template<class Event, size_t N = 0>
-		void handle(const Event& e) const
+		template<class Event>
+		void handle(const Event& e)
 		{
-			auto cb = std::get<N>(m_callback_systems);
-			if (cb->getEventType() == e.getType())
-				cb->handle(e);
-
-			if (N < sizeof...(Events))
-				handle<Event, N + 1>(e);
+			handleInternal<Event, 0, Events...>(e);
 		}
 
-		template<class Serializer, size_t N = 0>
-		void handleSerialized(EventType type, Serializer& s) const
+		template<class Serializer>
+		void handleSerialized(EventType type, Serializer& s)
+		{
+			handleSerializedInternal<Serializer, 0, Events...>(type, s);
+		}
+
+	private:
+		std::tuple<const typename Events::CallbackSystem*...> m_callback_systems;
+
+		template<class Event, size_t N>
+		void handleInternal(const Event&)
+		{
+		}
+
+		template<class Event, size_t N, class RegEvent0, class... RegEvents>
+		std::enable_if_t<std::is_same<Event, RegEvent0>::value>
+			handleInternal(const Event& e)
+		{
+			auto cb = std::get<N>(m_callback_systems);
+			cb->handle(e);
+
+			handleInternal<Event, N + 1, RegEvents...>(e);
+		}
+
+		template<class Event, size_t N, class RegEvent0, class... RegEvents>
+		std::enable_if_t<!std::is_same<Event, RegEvent0>::value>
+			handleInternal(const Event& e)
+		{
+			handleInternal<Event, N + 1, RegEvents...>(e);
+		}
+
+		template<class Serializer, size_t N>
+		void handleSerializedInternal(EventType, Serializer&)
+		{
+		}
+
+		template<class Serializer, size_t N, class RegEvent0, class... RegEvents>
+		void handleSerializedInternal(EventType type, Serializer& s)
 		{
 			auto cb = std::get<N>(m_callback_systems);
 			if (cb->getEventType() == type)
 				cb->handleSerialized<Serializer>(s);
 
-			if (N < sizeof...(Events))
-				handleSerialized<Serializer, N + 1>(type, s);
+			handleSerializedInternal<Serializer, N + 1, RegEvents...>(type, s);
 		}
-
-	private:
-		std::tuple<const typename Events::CallbackSystem*...> m_callback_systems;
 	};
 }

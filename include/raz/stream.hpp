@@ -192,15 +192,15 @@ namespace raz
 	}
 
 
-	class Any;
-
 	namespace __fallback
 	{
-		template<class T, class = std::enable_if_t<std::is_same<T, Any>::value>>
-		std::false_type operator<< (std::ostream&, const T&);
+		struct Dummy {};
 
 		template<class T>
-		std::true_type operator>> (std::istream&, T&);
+		Dummy operator<< (std::ostream&, const T&);
+
+		template<class T>
+		Dummy operator>> (std::istream&, T&);
 	}
 
 	template<class T>
