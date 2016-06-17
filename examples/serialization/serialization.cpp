@@ -58,8 +58,7 @@ struct Foo
 	template<class Serializer>
 	raz::EnableSerializer<Serializer> operator()(Serializer& s)
 	{
-		s(user);
-		s(age);
+		s(user)(age);
 	}
 };
 
