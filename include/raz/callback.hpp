@@ -33,11 +33,12 @@ namespace raz
 	class Callback
 	{
 	public:
-		typedef void(*Handler)(Callback*, const T&); // should be a member function of derived class
+		typedef void(Callback::*Handler)(const T&); // should be a member function of derived class
 
-		Callback(CallbackSystem<T>* system, Handler handler) :
-			m_system(system),
-			m_handler(handler)
+		template<class Derived>
+		Callback(CallbackSystem<T>& system, void(Derived::*handler)(const T&)) :
+			m_system(&system),
+			m_handler(static_cast<Handler>(handler))
 		{
 			m_system->bind(this);
 		}
@@ -47,9 +48,9 @@ namespace raz
 			m_system->unbind(this);
 		}
 
-		void handle(const T& t) const
+		void handle(const T& t)
 		{
-			m_handler(this, t);
+			(*this.*m_handler)(t);
 		}
 
 	private:
