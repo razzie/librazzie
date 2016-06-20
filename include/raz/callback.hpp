@@ -62,12 +62,12 @@ namespace raz
 	class CallbackSystem // must always live longer than the bound callbacks
 	{
 	public:
-		void handle(const T& t) const // a callback that deletes itself here causes deadlock
+		void handle(const T& t) const
 		{
 			std::lock_guard<decltype(m_lock)> guard(m_lock);
 			for (auto callback : m_callbacks)
 			{
-				callback->handle(t);
+				callback->handle(t); // adding or deleting a callback here causes a deadlock
 			}
 		}
 
