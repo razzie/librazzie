@@ -126,13 +126,6 @@ namespace raz
 	template<size_t SIZE = 4096>
 	using Packet = typename Serializer<PacketBuffer<SIZE>>;
 
-	template<class CLIENT, size_t SIZE = 4096>
-	struct ClientPacket
-	{
-		CLIENT client;
-		Packet<SIZE> packet;
-	};
-
 	class NetworkException : public std::exception
 	{
 	public:
@@ -159,48 +152,147 @@ namespace raz
 		}
 
 		template<class Packet>
-		bool getPacket(Packet& packet, uint32_t timeous_ms = 0)
+		bool receive(Packet& packet, uint32_t timeous_ms = 0)
 		{
-			decltype(packet)::PacketData* data = packet.getPacketData();
+			decltype(packet)::PacketData* pdata = packet.getPacketData();
 			size_t netbuffer_len;
 
 			netbuffer_len = m_backend.wait(timeous_ms); // waits until data is available and returns its size
 
 			// check if at least the packet head could be read
-			if (netbuffer_len < sizeof(data->head))
+			if (netbuffer_len < sizeof(pdata->head))
 				return false;
 
-			m_backend.peek(reinterpret_cast<char*>(&data->head), sizeof(data->head));
+			m_backend.peek(reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
 
 			// check if the whole packet data is available
-			if ((netbuffer_len - sizeof(data->head) - sizeof(data->tail) < data->head.packet_size))
+			if ((netbuffer_len - sizeof(pdata->head) - sizeof(pdata->tail) < pdata->head.packet_size))
 				return false;
 
-			if (data->head.packet_size > packet.getDataCapacity())
-				throw NetworkException("Too large packet");
+			if (pdata->head.packet_size > packet.getDataCapacity())
+				throw NetworkException("Insufficient packet capacity");
 
 			// reading actual data to the packet
-			m_backend.read(reinterpret_cast<char*>(&data->head), sizeof(data->head));
-			m_backend.read(data->data, data->head.packet_size);
-			m_backend.read(reinterpret_cast<char*>(&data->tail), sizeof(data->tail));
+			m_backend.read(reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
+			m_backend.read(pdata->data, pdata->head.packet_size);
+			m_backend.read(reinterpret_cast<char*>(&pdata->tail), sizeof(pdata->tail));
 
-			if (!data->fail.ok())
+			if (!pdata->tail.ok())
 				throw NetworkException("Corrupted packet");
 
 			return true;
 		}
 
 		template<class Packet>
-		void sendPacket(const Packet& packet)
+		void send(Packet& packet)
 		{
 			const decltype(packet)::PacketData* data = packet.getPacketData();
 
-			m_backend.write(reinterpret_cast<const char*>(&data->head), sizeof(data->head));
-			m_backend.write(data->data, data->head.packet_size);
-			m_backend.write(reinterpret_cast<const char*>(&data->tail), sizeof(data->tail));
+			// move tailing bytes to the proper position if necessary
+			if (reinterpret_cast<const char*>(&pdata->tail) != &pdata->data[pdata->packet_size])
+				std::memcpy(&pdata->data[pdata->packet_size], &pdata->tail, sizeof(pdata->tail));
+
+			m_backend.write(reinterpret_cast<const char*>(data), sizeof(pdata->head) + pdata->packet_size + sizeof(pdata->tail));
+		}
+
+		ClientBackend& getBackend()
+		{
+			return m_backend;
+		}
+
+		const ClientBackend& getBackend() const
+		{
+			return m_backend;
 		}
 
 	private:
 		ClientBackend m_backend;
+	};
+
+	template<class ServerBackend>
+	class NetworkServer
+	{
+	public:
+		typedef typename ServerBackend::Client Client;
+		typedef typename ServerBackend::ClientState ClientState;
+
+		template<size_t SIZE>
+		struct ClientData
+		{
+			//enum State
+			//{
+			//	INITIAL,
+			//	CONNECTED,
+			//	PACKET_RECEIVED,
+			//	DISCONNECTED,
+			//	ERROR
+			//};
+
+			Client client;
+			Packet<SIZE> packet;
+			ClientState state;
+		};
+
+		template<class... Args>
+		NetworkServer(Args... args) : m_backend(std::forward<Args>(args)...)
+		{
+		}
+
+		template<class ClientData>
+		bool receive(ClientData& data)
+		{
+			decltype(data.packet)::PacketData* pdata = data.packet.getPacketData();
+			size_t netbuffer_len;
+
+			netbuffer_len = m_backend.wait(data.client, data.state, timeous_ms); // waits until data is available and returns its size
+
+			// check if at least the packet head could be read
+			if (netbuffer_len < sizeof(pdata->head))
+				return false;
+
+			m_backend.peek(data.client, reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
+
+			// check if the whole packet data is available
+			if ((netbuffer_len - sizeof(pdata->head) - sizeof(pdata->tail) < pdata->head.packet_size))
+				return false;
+
+			if (pdata->head.packet_size > data.packet.getDataCapacity())
+				throw NetworkException("Insufficient packet capacity");
+
+			// reading actual data to the packet
+			m_backend.read(data.client, reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
+			m_backend.read(data.client, pdata->data, pdata->head.packet_size);
+			m_backend.read(data.client, reinterpret_cast<char*>(&pdata->tail), sizeof(pdata->tail));
+
+			if (!pdata->tail.ok())
+				throw NetworkException("Corrupted packet");
+
+			return true;
+		}
+
+		template<class Packet>
+		void send(Client& client, Packet& packet)
+		{
+			const decltype(packet)::PacketData* data = packet.getPacketData();
+
+			// move tailing bytes to the proper position if necessary
+			if (reinterpret_cast<const char*>(&pdata->tail) != &pdata->data[pdata->packet_size])
+				std::memcpy(&pdata->data[pdata->packet_size], &pdata->tail, sizeof(pdata->tail));
+
+			m_backend.write(client, reinterpret_cast<const char*>(data), sizeof(pdata->head) + pdata->packet_size + sizeof(pdata->tail));
+		}
+
+		ServerBackend& getBackend()
+		{
+			return m_backend;
+		}
+
+		const ServerBackend& getBackend() const
+		{
+			return m_backend;
+		}
+
+	private:
+		ServerBackend m_backend;
 	};
 }
