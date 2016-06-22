@@ -124,10 +124,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\raz\callback.hpp" />
-    <ClInclude Include="..\..\include\raz\event.hpp" />
     <ClInclude Include="..\..\include\raz\ieee754.hpp" />
     <ClInclude Include="..\..\include\raz\network.hpp" />
+    <ClInclude Include="..\..\include\raz\networkbackend.hpp" />
     <ClInclude Include="..\..\include\raz\serialization.hpp" />
   </ItemGroup>
   <ItemGroup>
