@@ -23,8 +23,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #include <cstdint>
 #include <cstring>
+#include <exception>
 #include <type_traits>
-#include "raz/event.hpp"
 #include "raz/serialization.hpp"
 
 namespace raz
@@ -123,23 +123,25 @@ namespace raz
 		size_t m_data_pos;
 	};
 
-	template<size_t SIZE = 4096>
+	template<size_t SIZE = 2048>
 	using Packet = typename Serializer<PacketBuffer<SIZE>>;
 
-	class NetworkException : public std::exception
+	class PacketCapacityException : public std::exception
 	{
 	public:
-		NetworkException(const char* what) : m_what(what)
-		{
-		}
-
 		virtual const char* what() const
 		{
-			return m_what;
+			return "Insufficient packet capacity";
 		}
+	};
 
-	private:
-		const char* m_what;
+	class CorruptedPacketException : public std::exception
+	{
+	public:
+		virtual const char* what() const
+		{
+			return "Corrupted packet";
+		}
 	};
 
 	template<class ClientBackend>
@@ -166,11 +168,11 @@ namespace raz
 			m_backend.peek(reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
 
 			// check if the whole packet data is available
-			if ((netbuffer_len - sizeof(pdata->head) - sizeof(pdata->tail) < pdata->head.packet_size))
+			if ((netbuffer_len - sizeof(pdata->head) - sizeof(pdata->tail)) < pdata->head.packet_size)
 				return false;
 
 			if (pdata->head.packet_size > packet.getDataCapacity())
-				throw NetworkException("Insufficient packet capacity");
+				throw PacketCapacityException();
 
 			// reading actual data to the packet
 			m_backend.read(reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
@@ -178,7 +180,7 @@ namespace raz
 			m_backend.read(reinterpret_cast<char*>(&pdata->tail), sizeof(pdata->tail));
 
 			if (!pdata->tail.ok())
-				throw NetworkException("Corrupted packet");
+				throw CorruptedPacketException();
 
 			return true;
 		}
@@ -219,15 +221,6 @@ namespace raz
 		template<size_t SIZE>
 		struct ClientData
 		{
-			//enum State
-			//{
-			//	INITIAL,
-			//	CONNECTED,
-			//	PACKET_RECEIVED,
-			//	DISCONNECTED,
-			//	ERROR
-			//};
-
 			Client client;
 			Packet<SIZE> packet;
 			ClientState state;
@@ -239,7 +232,7 @@ namespace raz
 		}
 
 		template<class ClientData>
-		bool receive(ClientData& data)
+		bool receive(ClientData& data, uint32_t timeous_ms = 0)
 		{
 			decltype(data.packet)::PacketData* pdata = data.packet.getPacketData();
 			size_t netbuffer_len;
@@ -253,11 +246,11 @@ namespace raz
 			m_backend.peek(data.client, reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
 
 			// check if the whole packet data is available
-			if ((netbuffer_len - sizeof(pdata->head) - sizeof(pdata->tail) < pdata->head.packet_size))
+			if ((netbuffer_len - sizeof(pdata->head) - sizeof(pdata->tail)) < pdata->head.packet_size)
 				return false;
 
 			if (pdata->head.packet_size > data.packet.getDataCapacity())
-				throw NetworkException("Insufficient packet capacity");
+				throw PacketCapacityException();
 
 			// reading actual data to the packet
 			m_backend.read(data.client, reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
@@ -265,7 +258,7 @@ namespace raz
 			m_backend.read(data.client, reinterpret_cast<char*>(&pdata->tail), sizeof(pdata->tail));
 
 			if (!pdata->tail.ok())
-				throw NetworkException("Corrupted packet");
+				throw CorruptedPacketException();
 
 			return true;
 		}
