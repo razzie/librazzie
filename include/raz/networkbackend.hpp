@@ -52,11 +52,37 @@ namespace raz
 		}
 	};
 
+	class NetworkInitializer
+	{
+	public:
+		NetworkInitializer()
+		{
+			WSADATA wsaData;
+			WSAStartup(MAKEWORD(2, 2), &wsaData);
+		}
+
+		~NetworkInitializer()
+		{
+			WSACleanup();
+		}
+
+		NetworkInitializer(const NetworkInitializer&) = delete;
+	};
+
 	class ClientBackendTCP
 	{
 	public:
-		ClientBackendTCP(const char* host, uint16_t port, bool ipv6 = false)
+		ClientBackendTCP() : m_socket(INVALID_SOCKET)
 		{
+		}
+
+		bool open(const char* host, uint16_t port, bool ipv6 = false)
+		{
+			if (m_socket != INVALID_SOCKET)
+			{
+				close();
+			}
+
 			std::string port_str = std::to_string(port);
 			struct addrinfo hints, *result = NULL, *ptr = NULL;
 
@@ -69,9 +95,10 @@ namespace raz
 			hints.ai_flags = AI_PASSIVE;
 
 			// resolve the local address and port to be used by the server
-			if (getaddrinfo(host, port_str.c_str(), &hints, &result) != 0)
+			int rc = getaddrinfo(host, port_str.c_str(), &hints, &result);
+			if (rc != 0)
 			{
-				throw NetworkConnectionError();
+				return false;
 			}
 
 			m_socket = INVALID_SOCKET;
@@ -99,7 +126,11 @@ namespace raz
 			freeaddrinfo(result);
 
 			if (m_socket == INVALID_SOCKET)
-				throw NetworkConnectionError();
+			{
+				return false;
+			}
+
+			return true;
 		}
 
 		size_t wait(uint32_t timeous_ms)
@@ -131,30 +162,42 @@ namespace raz
 		{
 			int rc = recv(m_socket, ptr, len, MSG_PEEK);
 			if (rc == SOCKET_ERROR)
+			{
 				throw NetworkSocketError();
+			}
 			else
+			{
 				return rc;
+			}
 		}
 
 		size_t read(char* ptr, size_t len)
 		{
 			int rc = recv(m_socket, ptr, len, 0);
 			if (rc == SOCKET_ERROR)
+			{
 				throw NetworkSocketError();
+			}
 			else
+			{
 				return rc;
+			}
 		}
 
 		size_t write(const char* ptr, size_t len)
 		{
 			int rc = send(m_socket, ptr, len, 0);
 			if (rc == SOCKET_ERROR)
+			{
 				throw NetworkSocketError();
+			}
 			else
+			{
 				return rc;
+			}
 		}
 
-		void disconnect()
+		void close()
 		{
 			closesocket(m_socket);
 			m_socket = INVALID_SOCKET;
@@ -177,13 +220,21 @@ namespace raz
 		enum ClientState
 		{
 			UNSET,
-			CONNECTED,
-			PACKET_RECEIVED,
-			DISCONNECTED
+			CLIENT_CONNECTED,
+			PACKET_RECEIVED
 		};
 
-		ServerBackendTCP(uint16_t port, bool ipv6 = false)
+		ServerBackendTCP() : m_socket(INVALID_SOCKET)
 		{
+		}
+
+		bool open(uint16_t port, bool ipv6 = false)
+		{
+			if (m_socket != INVALID_SOCKET)
+			{
+				close();
+			}
+
 			std::string port_str = std::to_string(port);
 			struct addrinfo hints, *result = NULL, *ptr = NULL;
 
@@ -196,9 +247,10 @@ namespace raz
 			hints.ai_flags = AI_PASSIVE;
 
 			// resolve the local address and port to be used by the server
-			if (getaddrinfo(NULL, port_str.c_str(), &hints, &result) != 0)
+			int rc = getaddrinfo(NULL, port_str.c_str(), &hints, &result);
+			if (rc != 0)
 			{
-				throw NetworkSocketError();
+				return false;
 			}
 
 			m_socket = INVALID_SOCKET;
@@ -238,8 +290,10 @@ namespace raz
 
 			if (m_socket == INVALID_SOCKET)
 			{
-				throw NetworkSocketError();
+				return false;
 			}
+
+			return true;
 		}
 
 		size_t wait(Client& client, ClientState& state, uint32_t timeous_ms)
@@ -254,7 +308,7 @@ namespace raz
 			timeout.tv_sec = timeous_ms / 1000;
 			timeout.tv_usec = (timeous_ms % 1000) * 1000;
 
-			int rc = select(m_socket + 1, &set, NULL, NULL, &timeout);
+			int rc = select(getLargestSocket() + 1, &set, NULL, NULL, &timeout);
 			if (rc == SOCKET_ERROR)
 			{
 				throw NetworkSocketError();
@@ -270,7 +324,9 @@ namespace raz
 						throw NetworkSocketError();
 					}
 
-					state = ClientState::CONNECTED;
+					m_clients.push_back(client);
+
+					state = ClientState::CLIENT_CONNECTED;
 					return 0;
 				}
 
@@ -282,6 +338,8 @@ namespace raz
 					{
 						client = m_clients[index];
 						state = ClientState::PACKET_RECEIVED;
+
+						m_client_to_check = index + 1; // check an other client next time
 
 						u_long bytes_available = 0;
 						ioctlsocket(sock, FIONREAD, &bytes_available);
@@ -298,30 +356,42 @@ namespace raz
 		{
 			int rc = recv(client.socket, ptr, len, MSG_PEEK);
 			if (rc == SOCKET_ERROR)
+			{
 				throw NetworkSocketError();
+			}
 			else
+			{
 				return rc;
+			}
 		}
 
 		size_t read(Client& client, char* ptr, size_t len)
 		{
 			int rc = recv(client.socket, ptr, len, 0);
 			if (rc == SOCKET_ERROR)
+			{
 				throw NetworkSocketError();
+			}
 			else
+			{
 				return rc;
+			}
 		}
 
 		size_t write(Client& client, const char* ptr, size_t len)
 		{
 			int rc = send(client.socket, ptr, len, 0);
 			if (rc == SOCKET_ERROR)
+			{
 				throw NetworkSocketError();
+			}
 			else
+			{
 				return rc;
+			}
 		}
 
-		void disconnect()
+		void close()
 		{
 			for (Client& client : m_clients)
 				closesocket(client.socket);
@@ -331,10 +401,36 @@ namespace raz
 			m_socket = INVALID_SOCKET;
 		}
 
+		void close(Client& client)
+		{
+			closesocket(client.socket);
+			for (auto it = m_clients.begin(), end = m_clients.end(); it != end; ++it)
+			{
+				if (it->socket == client.socket)
+				{
+					m_clients.erase(it);
+					return;
+				}
+			}
+		}
+
 	private:
 		SOCKET m_socket;
 		SOCKADDR_STORAGE m_sockaddr;
 		std::vector<Client> m_clients;
 		size_t m_client_to_check = 0;
+
+		SOCKET getLargestSocket()
+		{
+			SOCKET s = m_socket;
+
+			for (Client& client : m_clients)
+			{
+				if (client.socket > s)
+					s = client.socket;
+			}
+
+			return s;
+		}
 	};
 }

@@ -38,7 +38,7 @@ namespace raz
 		struct Head
 		{
 			PacketType packet_type;
-			uint16_t packet_size;
+			uint32_t packet_size;
 		};
 
 		struct Tail
@@ -58,9 +58,11 @@ namespace raz
 			m_mode(mode),
 			m_data_pos(0)
 		{
-			m_data.packet_type = type;
-			m_data.packet_size = 0;
+			m_data.head.packet_type = type;
+			m_data.head.packet_size = 0;
 		}
+
+		PacketBuffer(const PacketBuffer&) = delete;
 
 		SerializationMode getMode() const
 		{
@@ -74,12 +76,12 @@ namespace raz
 
 		PacketType getType() const
 		{
-			return m_data.type;
+			return m_data.head.packet_type;
 		}
 
 		void setType(PacketType type)
 		{
-			m_data.type = type;
+			m_data.head.packet_type = type;
 		}
 
 		PacketData* getPacketData()
@@ -99,22 +101,29 @@ namespace raz
 
 		size_t write(const char* ptr, size_t len)
 		{
-			if (SIZE - m_data.packet_size < len)
-				len = SIZE - m_data.packet_size;
+			if (SIZE - m_data.head.packet_size < len)
+				len = SIZE - m_data.head.packet_size;
 
-			std::memcpy(&m_data.data[m_data.packet_size], ptr, len);
-			m_data.packet_size += len;
+			std::memcpy(&m_data.data[m_data.head.packet_size], ptr, len);
+			m_data.head.packet_size += static_cast<uint32_t>(len);
 			return len;
 		}
 
 		size_t read(char* ptr, size_t len)
 		{
-			if (m_data.packet_size - m_data_pos < len)
-				len = m_data.packet_size - m_data_pos;
+			if (m_data.head.packet_size - m_data_pos < len)
+				len = m_data.head.packet_size - m_data_pos;
 
 			std::memcpy(ptr, &m_data.data[m_data_pos], len);
 			m_data_pos += len;
 			return len;
+		}
+
+		void reset()
+		{
+			m_data.head.packet_type = 0;
+			m_data.head.packet_size = 0;
+			m_data_pos = 0;
 		}
 
 	private:
@@ -174,10 +183,8 @@ namespace raz
 			if (pdata->head.packet_size > packet.getDataCapacity())
 				throw PacketCapacityException();
 
-			// reading actual data to the packet
-			m_backend.read(reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
-			m_backend.read(pdata->data, pdata->head.packet_size);
-			m_backend.read(reinterpret_cast<char*>(&pdata->tail), sizeof(pdata->tail));
+			// reading actual data to the packet (note: we don't care about where the tail is copied)
+			m_backend.read(reinterpret_cast<char*>(pdata), sizeof(pdata->head) + pdata->head.packet_size + sizeof(pdata->tail));
 
 			if (!pdata->tail.ok())
 				throw CorruptedPacketException();
@@ -188,13 +195,13 @@ namespace raz
 		template<class Packet>
 		void send(Packet& packet)
 		{
-			const decltype(packet)::PacketData* data = packet.getPacketData();
+			Packet::PacketData* pdata = packet.getPacketData();
 
 			// move tailing bytes to the proper position if necessary
-			if (reinterpret_cast<const char*>(&pdata->tail) != &pdata->data[pdata->packet_size])
-				std::memcpy(&pdata->data[pdata->packet_size], &pdata->tail, sizeof(pdata->tail));
+			if (reinterpret_cast<const char*>(&pdata->tail) != &pdata->data[pdata->head.packet_size])
+				std::memcpy(&pdata->data[pdata->head.packet_size], &pdata->tail, sizeof(pdata->tail));
 
-			m_backend.write(reinterpret_cast<const char*>(data), sizeof(pdata->head) + pdata->packet_size + sizeof(pdata->tail));
+			m_backend.write(reinterpret_cast<const char*>(pdata), sizeof(pdata->head) + pdata->head.packet_size + sizeof(pdata->tail));
 		}
 
 		ClientBackend& getBackend()
@@ -237,7 +244,7 @@ namespace raz
 			decltype(data.packet)::PacketData* pdata = data.packet.getPacketData();
 			size_t netbuffer_len;
 
-			netbuffer_len = m_backend.wait(data.client, data.state, timeous_ms); // waits until data is available and returns its size
+			netbuffer_len = m_backend.wait(std::ref(data.client), std::ref(data.state), timeous_ms); // waits until data is available and returns its size
 
 			// check if at least the packet head could be read
 			if (netbuffer_len < sizeof(pdata->head))
@@ -252,10 +259,8 @@ namespace raz
 			if (pdata->head.packet_size > data.packet.getDataCapacity())
 				throw PacketCapacityException();
 
-			// reading actual data to the packet
-			m_backend.read(data.client, reinterpret_cast<char*>(&pdata->head), sizeof(pdata->head));
-			m_backend.read(data.client, pdata->data, pdata->head.packet_size);
-			m_backend.read(data.client, reinterpret_cast<char*>(&pdata->tail), sizeof(pdata->tail));
+			// reading actual data to the packet (note: we don't care about where the tail is copied)
+			m_backend.read(data.client, reinterpret_cast<char*>(pdata), sizeof(pdata->head) + pdata->head.packet_size + sizeof(pdata->tail));
 
 			if (!pdata->tail.ok())
 				throw CorruptedPacketException();
@@ -266,13 +271,13 @@ namespace raz
 		template<class Packet>
 		void send(Client& client, Packet& packet)
 		{
-			const decltype(packet)::PacketData* data = packet.getPacketData();
+			Packet::PacketData* pdata = packet.getPacketData();
 
 			// move tailing bytes to the proper position if necessary
-			if (reinterpret_cast<const char*>(&pdata->tail) != &pdata->data[pdata->packet_size])
-				std::memcpy(&pdata->data[pdata->packet_size], &pdata->tail, sizeof(pdata->tail));
+			if (reinterpret_cast<const char*>(&pdata->tail) != &pdata->data[pdata->head.packet_size])
+				std::memcpy(&pdata->data[pdata->head.packet_size], &pdata->tail, sizeof(pdata->tail));
 
-			m_backend.write(client, reinterpret_cast<const char*>(data), sizeof(pdata->head) + pdata->packet_size + sizeof(pdata->tail));
+			m_backend.write(client, reinterpret_cast<const char*>(pdata), sizeof(pdata->head) + pdata->head.packet_size + sizeof(pdata->tail));
 		}
 
 		ServerBackend& getBackend()
