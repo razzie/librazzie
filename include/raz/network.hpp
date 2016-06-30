@@ -269,7 +269,7 @@ namespace raz
 		}
 
 		template<class Packet>
-		void send(Client& client, Packet& packet)
+		void send(const Client& client, Packet& packet)
 		{
 			Packet::PacketData* pdata = packet.getPacketData();
 
