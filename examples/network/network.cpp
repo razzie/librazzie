@@ -4,8 +4,11 @@
 #include "raz/network.hpp"
 #include "raz/networkbackend.hpp"
 
-typedef raz::NetworkClient<raz::ClientBackendTCP> Client;
-typedef raz::NetworkServer<raz::ServerBackendTCP> Server;
+typedef raz::NetworkClient<raz::NetworkClientBackendTCP> ClientTCP;
+typedef raz::NetworkServer<raz::NetworkServerBackendTCP> ServerTCP;
+
+typedef raz::NetworkClient<raz::NetworkClientBackendUDP>   ClientUDP;
+typedef raz::NetworkServer<raz::NetworkServerBackendUDP<>> ServerUDP;
 
 struct Foo
 {
@@ -18,13 +21,14 @@ struct Foo
 	}
 };
 
-void serverThreadFunc()
+template<class Server>
+void runServer(uint16_t port)
 {
 	Server server;
 	Server::ClientData<512> data;
 	Foo foo;
 
-	if (!server.getBackend().open(12345))
+	if (!server.getBackend().open(port))
 	{
 		std::cout << "Failed to start server" << std::endl;
 		return;
@@ -41,12 +45,47 @@ void serverThreadFunc()
 			while (!server.receive(data, 1000));
 
 			data.packet(foo);
-			std::cout << "packet received (Foo:" << foo.i << ")" << std::endl;
+			std::cout << "Packet received (Foo:" << foo.i << ")" << std::endl;
 		}
 	}
 	catch (std::exception& e)
 	{
-		std::cout << "server exception: " << e.what() << std::endl;
+		std::cout << "Server exception: " << e.what() << std::endl;
+	}
+}
+
+template<class Client>
+void runClient(uint16_t port)
+{
+	Client client;
+	raz::Packet<512> packet;
+	Foo foo;
+
+	if (!client.getBackend().open("localhost", port))
+	{
+		std::cout << "Failed to connect to server" << std::endl;
+		return;
+	}
+
+	try
+	{
+		packet.setMode(raz::SerializationMode::SERIALIZE);
+
+		for (int i = 0; i < 5; ++i)
+		{
+			foo.i = i;
+
+			packet.reset();
+			packet(foo);
+
+			client.send(packet);
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		}
+	}
+	catch (std::exception& e)
+	{
+		std::cout << "Client exception: " << e.what() << std::endl;
 	}
 }
 
@@ -54,42 +93,37 @@ raz::NetworkInitializer __init_network;
 
 int main()
 {
-	std::thread t(serverThreadFunc);
-	Client client;
-	raz::Packet<512> packet;
-	Foo foo;
+	int port = 12345;
+	int protocol;
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	std::cout << "Choose protocol\n 1 - TCP\n 2 - UDP" << std::endl;
+	std::cin >> protocol;
+	std::cout << std::endl;
 
-	if (client.getBackend().open("localhost", 12345))
+	if (protocol == 1)
 	{
-		try
-		{
-			packet.setMode(raz::SerializationMode::SERIALIZE);
+		std::thread t(runServer<ServerTCP>, port);
 
-			for (int i = 0; i < 5; ++i)
-			{
-				foo.i = i;
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-				packet.reset();
-				packet(foo);
+		runClient<ClientTCP>(port);
 
-				client.send(packet);
+		t.join();
+	}
+	else if (protocol == 2)
+	{
+		std::thread t(runServer<ServerUDP>, port);
 
-				std::this_thread::sleep_for(std::chrono::milliseconds(500));
-			}
-		}
-		catch (std::exception& e)
-		{
-			std::cout << "client exception: " << e.what() << std::endl;
-		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+		runClient<ClientUDP>(port);
+
+		t.join();
 	}
 	else
 	{
-		std::cout << "Failed to connect to server" << std::endl;
+		std::cout << "Wrong selection" << std::endl;
 	}
-
-	t.join();
 
 	return 0;
 }

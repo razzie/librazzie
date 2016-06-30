@@ -69,11 +69,22 @@ namespace raz
 		NetworkInitializer(const NetworkInitializer&) = delete;
 	};
 
-	class ClientBackendTCP
+
+	/*
+	 * TCP CLIENT AND SERVER BACKENDS
+	 */
+
+	class NetworkClientBackendTCP
 	{
 	public:
-		ClientBackendTCP() : m_socket(INVALID_SOCKET)
+		NetworkClientBackendTCP() : m_socket(INVALID_SOCKET)
 		{
+		}
+
+		NetworkClientBackendTCP(const char* host, uint16_t port, bool ipv6 = false) : m_socket(INVALID_SOCKET)
+		{
+			if (!open(host, port, ipv6))
+				throw NetworkSocketError();
 		}
 
 		bool open(const char* host, uint16_t port, bool ipv6 = false)
@@ -208,7 +219,7 @@ namespace raz
 		SOCKADDR_STORAGE m_sockaddr;
 	};
 
-	class ServerBackendTCP
+	class NetworkServerBackendTCP
 	{
 	public:
 		struct Client
@@ -224,8 +235,14 @@ namespace raz
 			PACKET_RECEIVED
 		};
 
-		ServerBackendTCP() : m_socket(INVALID_SOCKET)
+		NetworkServerBackendTCP() : m_socket(INVALID_SOCKET)
 		{
+		}
+
+		NetworkServerBackendTCP(uint16_t port, bool ipv6 = false) : m_socket(INVALID_SOCKET)
+		{
+			if (!open(port, ipv6))
+				throw NetworkSocketError();
 		}
 
 		bool open(uint16_t port, bool ipv6 = false)
@@ -352,7 +369,7 @@ namespace raz
 			return 0;
 		}
 
-		size_t peek(Client& client, char* ptr, size_t len)
+		size_t peek(const Client& client, char* ptr, size_t len)
 		{
 			int rc = recv(client.socket, ptr, len, MSG_PEEK);
 			if (rc == SOCKET_ERROR)
@@ -365,7 +382,7 @@ namespace raz
 			}
 		}
 
-		size_t read(Client& client, char* ptr, size_t len)
+		size_t read(const Client& client, char* ptr, size_t len)
 		{
 			int rc = recv(client.socket, ptr, len, 0);
 			if (rc == SOCKET_ERROR)
@@ -378,7 +395,7 @@ namespace raz
 			}
 		}
 
-		size_t write(Client& client, const char* ptr, size_t len)
+		size_t write(const Client& client, const char* ptr, size_t len)
 		{
 			int rc = send(client.socket, ptr, len, 0);
 			if (rc == SOCKET_ERROR)
@@ -401,7 +418,7 @@ namespace raz
 			m_socket = INVALID_SOCKET;
 		}
 
-		void close(Client& client)
+		void close(const Client& client)
 		{
 			closesocket(client.socket);
 			for (auto it = m_clients.begin(), end = m_clients.end(); it != end; ++it)
@@ -432,5 +449,340 @@ namespace raz
 
 			return s;
 		}
+	};
+
+
+	/*
+	 * UDP CLIENT AND SERVER BACKENDS
+	 */
+
+	class NetworkClientBackendUDP
+	{
+	public:
+		NetworkClientBackendUDP() : m_socket(INVALID_SOCKET)
+		{
+		}
+
+		NetworkClientBackendUDP(const char* host, uint16_t port, bool ipv6 = false) : m_socket(INVALID_SOCKET)
+		{
+			if (!open(host, port, ipv6))
+				throw NetworkSocketError();
+		}
+
+		bool open(const char* host, uint16_t port, bool ipv6 = false)
+		{
+			if (m_socket != INVALID_SOCKET)
+			{
+				close();
+			}
+
+			std::string port_str = std::to_string(port);
+			struct addrinfo hints, *result = NULL, *ptr = NULL;
+
+			std::memset(&m_sockaddr, 0, sizeof(SOCKADDR_STORAGE));
+
+			std::memset(&hints, 0, sizeof(struct addrinfo));
+			hints.ai_family = ipv6 ? AF_INET6 : AF_INET;
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_protocol = IPPROTO_UDP;
+			hints.ai_flags = AI_PASSIVE;
+
+			// resolve the local address and port to be used by the server
+			int rc = getaddrinfo(host, port_str.c_str(), &hints, &result);
+			if (rc != 0)
+			{
+				return false;
+			}
+
+			m_socket = INVALID_SOCKET;
+
+			// attempt to connect to the first possible address in the list returned by getaddrinfo
+			for (ptr = result; ptr != NULL; ptr = ptr->ai_next)
+			{
+				m_socket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+				if (m_socket == INVALID_SOCKET)
+				{
+					continue;
+				}
+
+				std::memcpy(&m_sockaddr, ptr->ai_addr, ptr->ai_addrlen);
+
+				// everything is OK if we get here
+				break;
+			}
+
+			freeaddrinfo(result);
+
+			if (m_socket == INVALID_SOCKET)
+			{
+				return false;
+			}
+
+			return true;
+		}
+
+		size_t wait(uint32_t timeous_ms)
+		{
+			fd_set set;
+			FD_ZERO(&set);
+			FD_SET(m_socket, &set);
+
+			struct timeval timeout;
+			timeout.tv_sec = timeous_ms / 1000;
+			timeout.tv_usec = (timeous_ms % 1000) * 1000;
+
+			int rc = select(m_socket + 1, &set, NULL, NULL, &timeout);
+			if (rc == SOCKET_ERROR)
+			{
+				throw NetworkSocketError();
+			}
+			else if (rc > 0)
+			{
+				return rc;
+			}
+			else
+			{
+				return 0;
+			}
+		}
+
+		size_t peek(char* ptr, size_t len)
+		{
+			int rc = recv(m_socket, ptr, len, MSG_PEEK);
+			if (rc == SOCKET_ERROR)
+			{
+				throw NetworkSocketError();
+			}
+			else
+			{
+				return rc;
+			}
+		}
+
+		size_t read(char* ptr, size_t len)
+		{
+			int rc = recv(m_socket, ptr, len, 0);
+			if (rc == SOCKET_ERROR)
+			{
+				throw NetworkSocketError();
+			}
+			else
+			{
+				return rc;
+			}
+		}
+
+		size_t write(const char* ptr, size_t len)
+		{
+			int rc = sendto(m_socket, ptr, len, 0, reinterpret_cast<const struct sockaddr*>(&m_sockaddr), sizeof(SOCKADDR_STORAGE));
+			if (rc == SOCKET_ERROR)
+			{
+				throw NetworkSocketError();
+			}
+			else
+			{
+				return rc;
+			}
+		}
+
+		void close()
+		{
+			closesocket(m_socket);
+			m_socket = INVALID_SOCKET;
+		}
+
+	private:
+		SOCKET m_socket;
+		SOCKADDR_STORAGE m_sockaddr;
+	};
+
+	template<size_t BUF_SIZE = 2048>
+	class NetworkServerBackendUDP
+	{
+	public:
+		struct Client
+		{
+			SOCKADDR_STORAGE sockaddr;
+
+			bool operator!=(const Client& other) const
+			{
+				return (std::memcmp(&sockaddr, &other.sockaddr, sizeof(SOCKADDR_STORAGE)) != 0);
+			}
+		};
+
+		enum ClientState
+		{
+			UNSET,
+			PACKET_RECEIVED
+		};
+
+		NetworkServerBackendUDP() :
+			m_socket(INVALID_SOCKET),
+			m_data_len(0),
+			m_data_pos(0)
+		{
+		}
+
+		NetworkServerBackendUDP(uint16_t port, bool ipv6 = false) :
+			m_socket(INVALID_SOCKET),
+			m_data_len(0),
+			m_data_pos(0)
+		{
+			if (!open(port, ipv6))
+				throw NetworkSocketError();
+		}
+
+		bool open(uint16_t port, bool ipv6 = false)
+		{
+			if (m_socket != INVALID_SOCKET)
+			{
+				close();
+			}
+
+			std::string port_str = std::to_string(port);
+			struct addrinfo hints, *result = NULL, *ptr = NULL;
+
+			std::memset(&m_sockaddr, 0, sizeof(SOCKADDR_STORAGE));
+
+			std::memset(&hints, 0, sizeof(struct addrinfo));
+			hints.ai_family = ipv6 ? AF_INET6 : AF_INET;
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_protocol = IPPROTO_UDP;
+			hints.ai_flags = AI_PASSIVE;
+
+			// resolve the local address and port to be used by the server
+			int rc = getaddrinfo(NULL, port_str.c_str(), &hints, &result);
+			if (rc != 0)
+			{
+				return false;
+			}
+
+			m_socket = INVALID_SOCKET;
+
+			// attempt to connect to the first possible address in the list returned by getaddrinfo
+			for (ptr = result; ptr != NULL; ptr = ptr->ai_next)
+			{
+				m_socket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+				if (m_socket == INVALID_SOCKET)
+				{
+					continue;
+				}
+
+				int no = 0;
+				setsockopt(m_socket, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&no, sizeof(no));
+				setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)ptr->ai_addr, (int)ptr->ai_addrlen);
+
+				if (bind(m_socket, ptr->ai_addr, (int)ptr->ai_addrlen) == SOCKET_ERROR)
+				{
+					closesocket(m_socket);
+					m_socket = INVALID_SOCKET;
+					continue;
+				}
+
+				// everything is OK if we get here
+				break;
+			}
+
+			freeaddrinfo(result);
+
+			if (m_socket == INVALID_SOCKET)
+			{
+				return false;
+			}
+
+			return true;
+		}
+
+		size_t wait(Client& client, ClientState& state, uint32_t timeous_ms)
+		{
+			fd_set set;
+			FD_ZERO(&set);
+			FD_SET(m_socket, &set);
+
+			struct timeval timeout;
+			timeout.tv_sec = timeous_ms / 1000;
+			timeout.tv_usec = (timeous_ms % 1000) * 1000;
+
+			int rc = select(m_socket + 1, &set, NULL, NULL, &timeout);
+			if (rc == SOCKET_ERROR)
+			{
+				throw NetworkSocketError();
+			}
+			else if (rc > 0)
+			{
+				int addrlen = sizeof(client.sockaddr);
+				m_data_len = recvfrom(m_socket, m_data, BUF_SIZE, 0, reinterpret_cast<struct sockaddr*>(&client.sockaddr), &addrlen);
+				m_data_pos = 0;
+				m_last_client = client;
+
+				state = ClientState::PACKET_RECEIVED;
+				return m_data_len;
+			}
+
+			state = ClientState::UNSET;
+			return 0;
+		}
+
+		size_t peek(const Client& client, char* ptr, size_t len)
+		{
+			if (client != m_last_client)
+			{
+				throw NetworkSocketError();
+			}
+
+			if (m_data_len - m_data_pos < len)
+			{
+				len = m_data_len - m_data_pos;
+			}
+
+			std::memcpy(ptr, &m_data[m_data_pos], len);
+
+			return len;
+		}
+
+		size_t read(const Client& client, char* ptr, size_t len)
+		{
+			if (client != m_last_client)
+			{
+				throw NetworkSocketError();
+			}
+
+			if (m_data_len - m_data_pos < len)
+			{
+				len = m_data_len - m_data_pos;
+			}
+
+			std::memcpy(ptr, &m_data[m_data_pos], len);
+			m_data_pos += len;
+
+			return len;
+		}
+
+		size_t write(const Client& client, const char* ptr, size_t len)
+		{
+			int rc = sendto(m_socket, ptr, len, 0, reinterpret_cast<const struct sockaddr*>(client.sockaddr), sizeof(client.sockaddr));
+			if (rc == SOCKET_ERROR)
+			{
+				throw NetworkSocketError();
+			}
+			else
+			{
+				return rc;
+			}
+		}
+
+		void close()
+		{
+			closesocket(m_socket);
+			m_socket = INVALID_SOCKET;
+		}
+
+	private:
+		SOCKET m_socket;
+		SOCKADDR_STORAGE m_sockaddr;
+		Client m_last_client;
+		size_t m_data_len;
+		size_t m_data_pos;
+		char m_data[BUF_SIZE];
 	};
 }
