@@ -25,18 +25,12 @@ struct Foo
 template<class Server>
 void runServer(uint16_t port, std::future<void> exit_token)
 {
-	Server server;
-	Server::ClientData<512> data;
-	Foo foo;
-
-	if (!server.getBackend().open(port))
-	{
-		std::cout << "Failed to start server" << std::endl;
-		return;
-	}
-
 	try
 	{
+		Server server(port);
+		Server::ClientData<512> data;
+		Foo foo;
+
 		std::cout << "Server started (port: " << port << ")" << std::endl;
 
 		for (;;)
@@ -62,6 +56,10 @@ void runServer(uint16_t port, std::future<void> exit_token)
 			std::cout << "Server: foo sent to client (value:" << foo.value << ")" << std::endl;
 		}
 	}
+	catch (raz::NetworkConnectionError&)
+	{
+		std::cout << "Failed to start server" << std::endl;
+	}
 	catch (std::exception& e)
 	{
 		std::cout << "Server exception: " << e.what() << std::endl;
@@ -71,18 +69,12 @@ void runServer(uint16_t port, std::future<void> exit_token)
 template<class Client>
 void runClient(uint16_t port)
 {
-	Client client;
-	raz::Packet<512> packet;
-	Foo foo;
-
-	if (!client.getBackend().open("localhost", port))
-	{
-		std::cout << "Failed to connect to server" << std::endl;
-		return;
-	}
-
 	try
 	{
+		Client client("localhost", port);
+		raz::Packet<512> packet;
+		Foo foo;
+
 		std::cout << "Client connected to server (localhost:" << port << ")" << std::endl;
 
 		foo.value = 99;
@@ -98,6 +90,10 @@ void runClient(uint16_t port)
 		packet.setMode(raz::SerializationMode::DESERIALIZE);
 		packet(foo); // deserialize foo
 		std::cout << "Client: foo received (value: " << foo.value << ")" << std::endl;
+	}
+	catch (raz::NetworkConnectionError&)
+	{
+		std::cout << "Failed to connect to server" << std::endl;
 	}
 	catch (std::exception& e)
 	{
