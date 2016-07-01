@@ -84,7 +84,7 @@ namespace raz
 		NetworkClientBackendTCP(const char* host, uint16_t port, bool ipv6 = false) : m_socket(INVALID_SOCKET)
 		{
 			if (!open(host, port, ipv6))
-				throw NetworkSocketError();
+				throw NetworkConnectionError();
 		}
 
 		bool open(const char* host, uint16_t port, bool ipv6 = false)
@@ -244,7 +244,7 @@ namespace raz
 		NetworkServerBackendTCP(uint16_t port, bool ipv6 = false) : m_socket(INVALID_SOCKET)
 		{
 			if (!open(port, ipv6))
-				throw NetworkSocketError();
+				throw NetworkConnectionError();
 		}
 
 		bool open(uint16_t port, bool ipv6 = false)
@@ -475,7 +475,7 @@ namespace raz
 			m_data_pos(0)
 		{
 			if (!open(host, port, ipv6))
-				throw NetworkSocketError();
+				throw NetworkConnectionError();
 		}
 
 		bool open(const char* host, uint16_t port, bool ipv6 = false)
@@ -642,7 +642,7 @@ namespace raz
 			m_data_pos(0)
 		{
 			if (!open(port, ipv6))
-				throw NetworkSocketError();
+				throw NetworkConnectionError();
 		}
 
 		bool open(uint16_t port, bool ipv6 = false)
