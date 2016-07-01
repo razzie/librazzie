@@ -1,4 +1,5 @@
 #include <chrono>
+#include <future>
 #include <iostream>
 #include <thread>
 #include "raz/network.hpp"
@@ -7,22 +8,22 @@
 typedef raz::NetworkClient<raz::NetworkClientBackendTCP> ClientTCP;
 typedef raz::NetworkServer<raz::NetworkServerBackendTCP> ServerTCP;
 
-typedef raz::NetworkClient<raz::NetworkClientBackendUDP>   ClientUDP;
+typedef raz::NetworkClient<raz::NetworkClientBackendUDP<>> ClientUDP;
 typedef raz::NetworkServer<raz::NetworkServerBackendUDP<>> ServerUDP;
 
 struct Foo
 {
-	int i;
+	int value;
 
 	template<class Serializer>
-	raz::EnableSerializer<Serializer> operator()(Serializer& s)
+	raz::EnableSerializer<Serializer> operator()(Serializer& serializer)
 	{
-		s(i);
+		serializer(value);
 	}
 };
 
 template<class Server>
-void runServer(uint16_t port)
+void runServer(uint16_t port, std::future<void> exit_token)
 {
 	Server server;
 	Server::ClientData<512> data;
@@ -36,16 +37,29 @@ void runServer(uint16_t port)
 
 	try
 	{
-		data.packet.setMode(raz::SerializationMode::DESERIALIZE);
+		std::cout << "Server started (port: " << port << ")" << std::endl;
 
-		for (int i = 0; i < 5; ++i)
+		for (;;)
 		{
 			data.packet.reset();
+			while (!server.receive(data, 1000)) // wait until packet is received
+			{
+				auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
+				if (exit_status == std::future_status::ready) return;
+			}
 
-			while (!server.receive(data, 1000));
+			data.packet.setMode(raz::SerializationMode::DESERIALIZE);
+			data.packet(foo); // deserialize foo
+			std::cout << "Server: foo received (value:" << foo.value << ")" << std::endl;
 
-			data.packet(foo);
-			std::cout << "Packet received (Foo:" << foo.i << ")" << std::endl;
+			foo.value += foo.value; // change foo value before sending it back
+
+			data.packet.reset();
+			data.packet.setMode(raz::SerializationMode::SERIALIZE);
+			data.packet(foo); // serialize foo
+
+			server.send(data.client, data.packet); // send foo to client
+			std::cout << "Server: foo sent to client (value:" << foo.value << ")" << std::endl;
 		}
 	}
 	catch (std::exception& e)
@@ -69,19 +83,21 @@ void runClient(uint16_t port)
 
 	try
 	{
+		std::cout << "Client connected to server (localhost:" << port << ")" << std::endl;
+
+		foo.value = 99;
 		packet.setMode(raz::SerializationMode::SERIALIZE);
+		packet(foo); // serialize foo
 
-		for (int i = 0; i < 5; ++i)
-		{
-			foo.i = i;
+		client.send(packet); // send foo to server
+		std::cout << "Client: foo sent to server (value: " << foo.value << ")" << std::endl;
 
-			packet.reset();
-			packet(foo);
+		packet.reset();
+		while (!client.receive(packet, 1000)); // wait until packet is received
 
-			client.send(packet);
-
-			std::this_thread::sleep_for(std::chrono::milliseconds(500));
-		}
+		packet.setMode(raz::SerializationMode::DESERIALIZE);
+		packet(foo); // deserialize foo
+		std::cout << "Client: foo received (value: " << foo.value << ")" << std::endl;
 	}
 	catch (std::exception& e)
 	{
@@ -93,6 +109,7 @@ raz::NetworkInitializer __init_network;
 
 int main()
 {
+	std::promise<void> server_exit_token;
 	int port = 12345;
 	int protocol;
 
@@ -102,22 +119,16 @@ int main()
 
 	if (protocol == 1)
 	{
-		std::thread t(runServer<ServerTCP>, port);
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
+		std::thread t(runServer<ServerTCP>, port, server_exit_token.get_future());
 		runClient<ClientTCP>(port);
-
+		server_exit_token.set_value();
 		t.join();
 	}
 	else if (protocol == 2)
 	{
-		std::thread t(runServer<ServerUDP>, port);
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
+		std::thread t(runServer<ServerUDP>, port, server_exit_token.get_future());
 		runClient<ClientUDP>(port);
-
+		server_exit_token.set_value();
 		t.join();
 	}
 	else
