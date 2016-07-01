@@ -165,7 +165,7 @@ namespace raz
 		template<class Packet>
 		bool receive(Packet& packet, uint32_t timeous_ms = 0)
 		{
-			decltype(packet)::PacketData* pdata = packet.getPacketData();
+			Packet::PacketData* pdata = packet.getPacketData();
 			size_t netbuffer_len;
 
 			netbuffer_len = m_backend.wait(timeous_ms); // waits until data is available and returns its size

@@ -161,7 +161,9 @@ namespace raz
 			}
 			else if (rc > 0)
 			{
-				return rc;
+				u_long bytes_available = 0;
+				ioctlsocket(m_socket, FIONREAD, &bytes_available);
+				return static_cast<size_t>(bytes_available);
 			}
 			else
 			{
@@ -456,14 +458,21 @@ namespace raz
 	 * UDP CLIENT AND SERVER BACKENDS
 	 */
 
+	template<size_t BUF_SIZE = 2048>
 	class NetworkClientBackendUDP
 	{
 	public:
-		NetworkClientBackendUDP() : m_socket(INVALID_SOCKET)
+		NetworkClientBackendUDP() :
+			m_socket(INVALID_SOCKET),
+			m_data_len(0),
+			m_data_pos(0)
 		{
 		}
 
-		NetworkClientBackendUDP(const char* host, uint16_t port, bool ipv6 = false) : m_socket(INVALID_SOCKET)
+		NetworkClientBackendUDP(const char* host, uint16_t port, bool ipv6 = false) :
+			m_socket(INVALID_SOCKET),
+			m_data_len(0),
+			m_data_pos(0)
 		{
 			if (!open(host, port, ipv6))
 				throw NetworkSocketError();
@@ -538,7 +547,9 @@ namespace raz
 			}
 			else if (rc > 0)
 			{
-				return rc;
+				m_data_len = recv(m_socket, m_data, BUF_SIZE, MSG_PEEK);
+				m_data_pos = 0;
+				return m_data_len;
 			}
 			else
 			{
@@ -548,28 +559,27 @@ namespace raz
 
 		size_t peek(char* ptr, size_t len)
 		{
-			int rc = recv(m_socket, ptr, len, MSG_PEEK);
-			if (rc == SOCKET_ERROR)
+			if (m_data_len - m_data_pos < len)
 			{
-				throw NetworkSocketError();
+				len = m_data_len - m_data_pos;
 			}
-			else
-			{
-				return rc;
-			}
+
+			std::memcpy(ptr, &m_data[m_data_pos], len);
+
+			return len;
 		}
 
 		size_t read(char* ptr, size_t len)
 		{
-			int rc = recv(m_socket, ptr, len, 0);
-			if (rc == SOCKET_ERROR)
+			if (m_data_len - m_data_pos < len)
 			{
-				throw NetworkSocketError();
+				len = m_data_len - m_data_pos;
 			}
-			else
-			{
-				return rc;
-			}
+
+			std::memcpy(ptr, &m_data[m_data_pos], len);
+			m_data_pos += len;
+
+			return len;
 		}
 
 		size_t write(const char* ptr, size_t len)
@@ -594,6 +604,9 @@ namespace raz
 	private:
 		SOCKET m_socket;
 		SOCKADDR_STORAGE m_sockaddr;
+		size_t m_data_len;
+		size_t m_data_pos;
+		char m_data[BUF_SIZE];
 	};
 
 	template<size_t BUF_SIZE = 2048>
@@ -760,7 +773,7 @@ namespace raz
 
 		size_t write(const Client& client, const char* ptr, size_t len)
 		{
-			int rc = sendto(m_socket, ptr, len, 0, reinterpret_cast<const struct sockaddr*>(client.sockaddr), sizeof(client.sockaddr));
+			int rc = sendto(m_socket, ptr, len, 0, reinterpret_cast<const struct sockaddr*>(&client.sockaddr), sizeof(client.sockaddr));
 			if (rc == SOCKET_ERROR)
 			{
 				throw NetworkSocketError();
