@@ -33,6 +33,7 @@ namespace raz
 	class Callback
 	{
 	public:
+		typedef T ValueType;
 		typedef void(Callback::*Handler)(const T&); // should be a member function of derived class
 
 		template<class Derived>
