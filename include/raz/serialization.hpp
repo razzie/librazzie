@@ -52,16 +52,11 @@ namespace raz
 		{
 		}
 
-		SerializationMode getMode() const
-		{
-			return BufferType::getMode();
-		}
-
 		template<class I>
 		typename std::enable_if_t<std::is_integral<I>::value, Serializer>&
 			operator()(I& i)
 		{
-			if (getMode() == SerializationMode::SERIALIZE)
+			if (BufferType::getMode() == SerializationMode::SERIALIZE)
 			{
 				I tmp = i;
 
@@ -89,7 +84,7 @@ namespace raz
 
 		Serializer& operator()(float& f)
 		{
-			if (getMode() == SerializationMode::SERIALIZE)
+			if (BufferType::getMode() == SerializationMode::SERIALIZE)
 			{
 				uint32_t tmp = static_cast<uint32_t>(pack754_32(f));
 				(*this)(tmp);
@@ -106,7 +101,7 @@ namespace raz
 
 		Serializer& operator()(double& d)
 		{
-			if (getMode() == SerializationMode::SERIALIZE)
+			if (BufferType::getMode() == SerializationMode::SERIALIZE)
 			{
 				uint64_t tmp = pack754_32(d);
 				(*this)(tmp);
@@ -123,7 +118,7 @@ namespace raz
 
 		Serializer& operator()(std::string& str)
 		{
-			if (getMode() == SerializationMode::SERIALIZE)
+			if (BufferType::getMode() == SerializationMode::SERIALIZE)
 			{
 				uint32_t len = static_cast<uint32_t>(str.length());
 				(*this)(len);

@@ -56,23 +56,23 @@ struct Foo
 	int age;
 
 	template<class Serializer>
-	raz::EnableSerializer<Serializer> operator()(Serializer& s)
+	raz::EnableSerializer<Serializer> operator()(Serializer& serializer)
 	{
-		s(user)(age);
+		serializer(user)(age);
 	}
 };
 
 int main()
 {
-	raz::Serializer<Buffer<1024>> s;
+	raz::Serializer<Buffer<1024>> serializer;
 	Foo foo_src = { "razzie", 99 };
 	Foo foo_dest;
 
-	s.setMode(raz::SerializationMode::SERIALIZE);
-	s(foo_src);
+	serializer.setMode(raz::SerializationMode::SERIALIZE);
+	serializer(foo_src);
 
-	s.setMode(raz::SerializationMode::DESERIALIZE);
-	s(foo_dest);
+	serializer.setMode(raz::SerializationMode::DESERIALIZE);
+	serializer(foo_dest);
 
 	std::cout << foo_dest.user << " - " << foo_dest.age << std::endl;
 
