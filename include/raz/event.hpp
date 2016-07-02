@@ -23,6 +23,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #include <cstdint>
 #include <tuple>
+#include <utility>
 #include "raz/callback.hpp"
 #include "raz/serialization.hpp"
 
@@ -144,7 +145,7 @@ namespace raz
 	class EventDispatcher // the given event callback systems must always live longer
 	{
 	public:
-		EventDispatcher(const typename Events::CallbackSystem&... callback_system) :
+		EventDispatcher(typename Events::CallbackSystem&... callback_system) :
 			m_callback_systems((&callback_system)...)
 		{
 		}
@@ -161,8 +162,14 @@ namespace raz
 			handleSerializedInternal<Serializer, 0, Events...>(type, s);
 		}
 
+	protected:
+		EventDispatcher(std::tuple<typename Events::CallbackSystem*...> callback_systems) :
+			m_callback_systems(callback_systems)
+		{
+		}
+
 	private:
-		std::tuple<const typename Events::CallbackSystem*...> m_callback_systems;
+		std::tuple<typename Events::CallbackSystem*...> m_callback_systems;
 
 		template<class Event, size_t N>
 		void handleInternal(const Event&)
@@ -199,6 +206,42 @@ namespace raz
 				cb->handleSerialized<Serializer>(s);
 
 			handleSerializedInternal<Serializer, N + 1, RegEvents...>(type, s);
+		}
+	};
+
+	template<class... Events>
+	class EventSystem : public EventDispatcher<Events...>
+	{
+	public:
+		EventSystem() :
+			EventDispatcher(getCallbackSystemPointers())
+		{
+		}
+
+		template<class Event>
+		typename Event::CallbackSystem& getSystemByEvent(Event* = nullptr)
+		{
+			return std::get<typename Event::CallbackSystem>(m_callback_systems);
+		}
+
+		template<class Callback>
+		typename Callback::ValueType::CallbackSystem& getSystemByCallback(Callback* = nullptr)
+		{
+			return std::get<typename Callback::ValueType::CallbackSystem>(m_callback_systems);
+		}
+
+	private:
+		std::tuple<typename Events::CallbackSystem...> m_callback_systems;
+
+		template<size_t... I>
+		std::tuple<typename Events::CallbackSystem*...> getCallbackSystemPointers(std::index_sequence<I...>)
+		{
+			return std::tuple<typename Events::CallbackSystem*...>((&std::get<I>(m_callback_systems))...);
+		}
+
+		std::tuple<typename Events::CallbackSystem*...> getCallbackSystemPointers()
+		{
+			return getCallbackSystemPointers(std::make_index_sequence<sizeof...(Events)>());
 		}
 	};
 }
