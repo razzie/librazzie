@@ -3,7 +3,7 @@
 
 struct Foo
 {
-	int i;
+	int value;
 };
 
 raz::CallbackSystem<Foo> foo_subscribers;
@@ -16,7 +16,7 @@ struct FooReceiver : public raz::Callback<Foo>
 
 	void receive(const Foo& foo)
 	{
-		std::cout << foo.i << std::endl;
+		std::cout << foo.value << std::endl;
 	}
 };
 

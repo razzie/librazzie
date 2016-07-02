@@ -87,6 +87,11 @@ namespace raz
 				throw NetworkConnectionError();
 		}
 
+		~NetworkClientBackendTCP()
+		{
+			close();
+		}
+
 		bool open(const char* host, uint16_t port, bool ipv6 = false)
 		{
 			if (m_socket != INVALID_SOCKET)
@@ -245,6 +250,11 @@ namespace raz
 		{
 			if (!open(port, ipv6))
 				throw NetworkConnectionError();
+		}
+
+		~NetworkServerBackendTCP()
+		{
+			close();
 		}
 
 		bool open(uint16_t port, bool ipv6 = false)
@@ -478,6 +488,11 @@ namespace raz
 				throw NetworkConnectionError();
 		}
 
+		~NetworkClientBackendUDP()
+		{
+			close();
+		}
+
 		bool open(const char* host, uint16_t port, bool ipv6 = false)
 		{
 			if (m_socket != INVALID_SOCKET)
@@ -643,6 +658,11 @@ namespace raz
 		{
 			if (!open(port, ipv6))
 				throw NetworkConnectionError();
+		}
+
+		~NetworkServerBackendUDP()
+		{
+			close();
 		}
 
 		bool open(uint16_t port, bool ipv6 = false)

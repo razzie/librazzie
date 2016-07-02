@@ -44,7 +44,7 @@ void runServer(uint16_t port, std::future<void> exit_token)
 
 			data.packet.setMode(raz::SerializationMode::DESERIALIZE);
 			data.packet(foo); // deserialize foo
-			std::cout << "Server: foo received (value:" << foo.value << ")" << std::endl;
+			std::cout << "Server: foo received (value: " << foo.value << ")" << std::endl;
 
 			foo.value += foo.value; // change foo value before sending it back
 
@@ -53,7 +53,7 @@ void runServer(uint16_t port, std::future<void> exit_token)
 			data.packet(foo); // serialize foo
 
 			server.send(data.client, data.packet); // send foo to client
-			std::cout << "Server: foo sent to client (value:" << foo.value << ")" << std::endl;
+			std::cout << "Server: foo sent to client (value: " << foo.value << ")" << std::endl;
 		}
 	}
 	catch (raz::NetworkConnectionError&)
