@@ -5,12 +5,6 @@
 #include "raz/network.hpp"
 #include "raz/networkbackend.hpp"
 
-typedef raz::NetworkClient<raz::NetworkClientBackendTCP> ClientTCP;
-typedef raz::NetworkServer<raz::NetworkServerBackendTCP> ServerTCP;
-
-typedef raz::NetworkClient<raz::NetworkClientBackendUDP<>> ClientUDP;
-typedef raz::NetworkServer<raz::NetworkServerBackendUDP<>> ServerUDP;
-
 struct Foo
 {
 	int value;
@@ -115,15 +109,15 @@ int main()
 
 	if (protocol == 1)
 	{
-		std::thread t(runServer<ServerTCP>, port, server_exit_token.get_future());
-		runClient<ClientTCP>(port);
+		std::thread t(runServer<raz::NetworkServerTCP>, port, server_exit_token.get_future());
+		runClient<raz::NetworkClientTCP>(port);
 		server_exit_token.set_value();
 		t.join();
 	}
 	else if (protocol == 2)
 	{
-		std::thread t(runServer<ServerUDP>, port, server_exit_token.get_future());
-		runClient<ClientUDP>(port);
+		std::thread t(runServer<raz::NetworkServerUDP<512>>, port, server_exit_token.get_future());
+		runClient<raz::NetworkClientUDP<512>>(port);
 		server_exit_token.set_value();
 		t.join();
 	}

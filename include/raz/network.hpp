@@ -293,4 +293,16 @@ namespace raz
 	private:
 		ServerBackend m_backend;
 	};
+
+
+	// include raz/networkbackend.hpp for definitions
+	class NetworkClientBackendTCP;
+	class NetworkServerBackendTCP;
+	template<size_t> class NetworkClientBackendUDP;
+	template<size_t> class NetworkServerBackendUDP;
+
+	typedef NetworkClient<raz::NetworkClientBackendTCP> NetworkClientTCP;
+	typedef NetworkServer<raz::NetworkServerBackendTCP> NetworkServerTCP;
+	template<size_t SIZE = 2048> using NetworkClientUDP = typename NetworkClient<raz::NetworkClientBackendUDP<SIZE>>;
+	template<size_t SIZE = 2048> using NetworkServerUDP = typename NetworkServer<raz::NetworkServerBackendUDP<SIZE>>;
 }
