@@ -45,7 +45,7 @@ namespace raz
 
 		~Callback()
 		{
-			m_system->unbind(this);
+			if (m_system) m_system->unbind(this);
 		}
 
 		void handle(const T& t)
@@ -54,14 +54,24 @@ namespace raz
 		}
 
 	private:
+		friend class CallbackSystem<T>;
+
 		CallbackSystem<T>* m_system;
 		Handler m_handler;
 	};
 
 	template<class T>
-	class CallbackSystem // must always live longer than the bound callbacks
+	class CallbackSystem
 	{
 	public:
+		~CallbackSystem()
+		{
+			for (auto callback : m_callbacks)
+			{
+				callback->m_system = nullptr;
+			}
+		}
+
 		void handle(const T& t) const
 		{
 			std::lock_guard<decltype(m_lock)> guard(m_lock);
