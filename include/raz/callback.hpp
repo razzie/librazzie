@@ -48,7 +48,7 @@ namespace raz
 			m_system(other.m_system),
 			m_handler(other.m_handler)
 		{
-			m_system->bind(this);
+			if (m_system) m_system->bind(this);
 		}
 
 		~Callback()
