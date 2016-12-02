@@ -22,7 +22,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #pragma once
 
 #include <cstdint>
-#include <cstring> // memset
+#include <cstring> // memset & memcpy
 #include <iterator>
 #include <stdexcept>
 
@@ -285,6 +285,11 @@ namespace raz
 			std::memset(m_data, 0, sizeof(m_data));
 		}
 
+		Bitset(const Bitset& other)
+		{
+			std::memcpy(m_data, other.m_data, sizeof(m_data));
+		}
+
 		bool isset(size_t pos) const
 		{
 			if (pos >= N)
@@ -307,6 +312,16 @@ namespace raz
 				throw std::out_of_range({});
 
 			m_data[pos / 32] &= ~(1u << (pos % 32));
+		}
+
+		const void* data() const
+		{
+			return m_data;
+		}
+
+		size_t size() const
+		{
+			return sizeof(m_data);
 		}
 
 		TrueBits truebits() const
