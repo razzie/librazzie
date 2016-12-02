@@ -334,6 +334,13 @@ namespace raz
 			return FalseBits(this);
 		}
 
+		template<class Serializer>
+		void operator()(Serializer& serializer)
+		{
+			for (size_t i = 0; i < DATA_SIZE; ++i)
+				serializer(m_data[i]);
+		}
+
 	private:
 		static constexpr size_t DATA_SIZE = ((N - 1) / 32) + 1;
 		uint32_t m_data[DATA_SIZE];
