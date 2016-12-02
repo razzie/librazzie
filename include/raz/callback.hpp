@@ -44,6 +44,13 @@ namespace raz
 			m_system->bind(this);
 		}
 
+		Callback(const Callback& other) :
+			m_system(other.m_system),
+			m_handler(other.m_handler)
+		{
+			m_system->bind(this);
+		}
+
 		~Callback()
 		{
 			if (m_system) m_system->unbind(this);
@@ -65,6 +72,10 @@ namespace raz
 	class CallbackSystem
 	{
 	public:
+		CallbackSystem() = default;
+
+		CallbackSystem(const CallbackSystem& other) = delete;
+
 		~CallbackSystem()
 		{
 			for (auto callback : m_callbacks)
