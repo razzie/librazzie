@@ -139,22 +139,6 @@ namespace raz
 			return *this;
 		}
 
-		//template<class T>
-		//class IsSerializable
-		//{
-		//	template<class C, class = decltype(std::declval<C>()(Serializer&))>
-		//	static std::true_type test(int);
-
-		//	template<class C>
-		//	static std::false_type test(...);
-
-		//public:
-		//	static constexpr bool value = decltype(test<T>(0))::value;
-		//};
-
-		//template<class T>
-		//using EnableSerializable = typename std::enable_if_t<IsSerializable<T>::value, Serializer>;
-
 		template<class T>
 		typename std::enable_if_t<!std::is_integral<T>::value, Serializer>& operator()(T& t)
 		{
