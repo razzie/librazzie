@@ -21,7 +21,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #pragma once
 
-#include <mutex>
 #include <vector>
 
 namespace raz
@@ -72,50 +71,79 @@ namespace raz
 	class CallbackSystem
 	{
 	public:
-		CallbackSystem() = default;
+		CallbackSystem() : m_handling_recursion(0)
+		{
+		}
 
 		CallbackSystem(const CallbackSystem& other) = delete;
 
 		~CallbackSystem()
 		{
+			processInsertecCallbacks();
+			processInsertecCallbacks();
+
 			for (auto callback : m_callbacks)
 			{
 				callback->m_system = nullptr;
 			}
 		}
 
-		void handle(const T& t) const
+		void handle(const T& t)
 		{
-			std::lock_guard<decltype(m_lock)> guard(m_lock);
+			if (m_handling_recursion == 0)
+			{
+				++m_handling_recursion;
+				processInsertecCallbacks();
+				processInsertecCallbacks();
+			}
+
 			for (auto callback : m_callbacks)
 			{
-				callback->handle(t); // adding or deleting a callback here causes a deadlock
+				callback->handle(t);
 			}
+
+			--m_handling_recursion;
 		}
 
 	private:
-		mutable std::mutex m_lock;
-		std::vector<Callback<T>*> m_callbacks;
-
 		friend class Callback<T>;
 
 		void bind(Callback<T>* callback)
 		{
-			std::lock_guard<decltype(m_lock)> guard(m_lock);
-			m_callbacks.push_back(callback);
+			m_inserted_callbacks.push_back(callback);
 		}
 
 		void unbind(Callback<T>* callback)
 		{
-			std::lock_guard<decltype(m_lock)> guard(m_lock);
-			for (auto it = m_callbacks.begin(), end = m_callbacks.end(); it != end; ++it)
+			m_removed_callbacks.push_back(callback);
+		}
+
+	private:
+		std::vector<Callback<T>*> m_callbacks;
+		std::vector<Callback<T>*> m_inserted_callbacks;
+		std::vector<Callback<T>*> m_removed_callbacks;
+		int m_handling_recursion;
+
+		void processInsertecCallbacks()
+		{
+			m_callbacks.insert(m_callbacks.end(), m_inserted_callbacks.begin(), m_inserted_callbacks.end());
+			m_inserted_callbacks.clear();
+		}
+
+		void processRemovedCallbacks()
+		{
+			for (auto callback : m_removed_callbacks)
 			{
-				if (*it == callback)
+				for (auto it = m_callbacks.begin(), end = m_callbacks.end(); it != end; ++it)
 				{
-					m_callbacks.erase(it);
-					return;
+					if (*it == callback)
+					{
+						m_callbacks.erase(it);
+						break;
+					}
 				}
 			}
+			m_removed_callbacks.clear();
 		}
 	};
 }
