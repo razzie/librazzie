@@ -282,7 +282,7 @@ namespace raz
 
 		Bitset()
 		{
-			std::memset(m_data, 0, sizeof(m_data));
+			reset();
 		}
 
 		Bitset(const Bitset& other)
@@ -312,6 +312,11 @@ namespace raz
 				throw std::out_of_range({});
 
 			m_data[pos / 32] &= ~(1u << (pos % 32));
+		}
+
+		void reset()
+		{
+			std::memset(m_data, 0, sizeof(m_data));
 		}
 
 		const void* data() const
