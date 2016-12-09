@@ -95,27 +95,32 @@ namespace raz
 
 			void findNext()
 			{
-				while (true)
-				{
-					if (m_bit >= m_last_bit)
-					{
-						m_bit = m_last_bit;
-						return;
-					}
+				if (m_bit == m_last_bit)
+					return;
 
-					uint32_t value = m_data[m_bit / 32] >> (m_bit % 32);
+				uint32_t value;
+
+				if (m_bit % 32)
+					value = m_data[m_bit / 32] >> ((m_bit % 32) - 1);
+				
+				do
+				{
+					if (m_bit % 32)
+						value >>= 1;
+					else
+						value = m_data[m_bit / 32] >> (m_bit % 32);
 
 					if (value == 0)
-					{
-						m_bit += (32 - (m_bit % 32));
-						continue;
-					}
+						m_bit += (32 - (m_bit % 32)); // skip the remaining of this 32bit block
+					else if ((value & 1) != 0)
+						return;
+					else
+						++m_bit;
 
-					if ((value & 1) != 0)
-						break;
+				} while (m_bit < m_last_bit);
 
-					++m_bit;
-				}
+				if (m_bit >= m_last_bit)
+					m_bit = m_last_bit;
 			}
 		};
 
@@ -182,27 +187,32 @@ namespace raz
 
 			void findNext()
 			{
-				while (true)
-				{
-					if (m_bit >= m_last_bit)
-					{
-						m_bit = m_last_bit;
-						return;
-					}
+				if (m_bit == m_last_bit)
+					return;
 
-					uint32_t value = ~m_data[m_bit / 32] >> (m_bit % 32);
+				uint32_t value;
+
+				if (m_bit % 32)
+					value = ~m_data[m_bit / 32] >> ((m_bit % 32) - 1);
+
+				do
+				{
+					if (m_bit % 32)
+						value >>= 1;
+					else
+						value = ~m_data[m_bit / 32] >> (m_bit % 32);
 
 					if (value == 0)
-					{
-						m_bit += (32 - (m_bit % 32));
-						continue;
-					}
+						m_bit += (32 - (m_bit % 32)); // skip the remaining of this 32bit block
+					else if ((value & 1) != 0)
+						return;
+					else
+						++m_bit;
 
-					if ((value & 1) != 0)
-						break;
+				} while (m_bit < m_last_bit);
 
-					++m_bit;
-				}
+				if (m_bit >= m_last_bit)
+					m_bit = m_last_bit;
 			}
 		};
 
