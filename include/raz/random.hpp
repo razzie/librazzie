@@ -105,6 +105,9 @@ namespace raz
 			serializer(m_state[0])(m_state[1]);
 		}
 
+#pragma push_macro("__raz")
+#undef min
+#undef max
 		static constexpr result_type min()
 		{
 			return (0);
@@ -114,6 +117,7 @@ namespace raz
 		{
 			return ((result_type)-1);
 		}
+#pragma pop_macro("__raz")
 
 		template<class CharT, class Traits>
 		friend std::basic_ostream<CharT, Traits>&

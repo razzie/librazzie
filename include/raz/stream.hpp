@@ -148,10 +148,10 @@ namespace raz
 		IstreamManipulator<char>::Manipulator m =
 			[](std::istream& i, char d) -> std::istream&
 			{
-#pragma push_macro("max")
+#pragma push_macro("__raz")
 #undef max
 				i.ignore(std::numeric_limits<std::streamsize>::max(), d);
-#pragma pop_macro("max")
+#pragma pop_macro("__raz")
 				return i;
 			};
 
