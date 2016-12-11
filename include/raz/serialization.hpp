@@ -103,14 +103,14 @@ namespace raz
 		{
 			if (BufferType::getMode() == SerializationMode::SERIALIZE)
 			{
-				uint64_t tmp = pack754_32(d);
+				uint64_t tmp = pack754_64(d);
 				(*this)(tmp);
 			}
 			else
 			{
 				uint64_t tmp;
 				(*this)(tmp);
-				d = unpack754_32(tmp);
+				d = unpack754_64(tmp);
 			}
 
 			return *this;
@@ -140,7 +140,7 @@ namespace raz
 		}
 
 		template<class T>
-		typename std::enable_if_t<!std::is_integral<T>::value, Serializer>& operator()(T& t)
+		typename std::enable_if_t<!std::is_arithmetic<T>::value, Serializer>& operator()(T& t)
 		{
 			t(*this);
 			return *this;

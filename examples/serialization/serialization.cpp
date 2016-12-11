@@ -73,20 +73,21 @@ private:
 
 struct Foo
 {
-	std::string user;
-	int age;
+	std::string member1;
+	int member2;
+	float member3;
 
 	template<class Serializer>
 	raz::EnableSerializer<Serializer> operator()(Serializer& serializer)
 	{
-		serializer(user)(age);
+		serializer(member1)(member2)(member3);
 	}
 };
 
 int main()
 {
 	raz::Serializer<Buffer<1024>> serializer;
-	Foo foo_src = { "razzie", 99 };
+	Foo foo_src = { "razzie", 99, 1.23f };
 	Foo foo_dest;
 
 	serializer.setMode(raz::SerializationMode::SERIALIZE);
@@ -95,7 +96,7 @@ int main()
 	serializer.setMode(raz::SerializationMode::DESERIALIZE);
 	serializer(foo_dest);
 
-	std::cout << foo_dest.user << " - " << foo_dest.age << std::endl;
+	std::cout << foo_dest.member1 << " - " << foo_dest.member2 << " - " << foo_dest.member3 << std::endl;
 
 	return 0;
 }
