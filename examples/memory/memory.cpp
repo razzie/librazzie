@@ -1,0 +1,43 @@
+/*
+Copyright (C) 2016 - Gábor "Razzie" Görzsöny
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
+*/
+
+#include <iostream>
+#include <vector>
+#include "raz/memory.hpp"
+#include "raz/random.hpp"
+
+int main()
+{
+	raz::MemoryPool<1024, sizeof(int)> mem;
+	std::vector<int, raz::Allocator<int>> vector(mem);
+
+	raz::RandomGenerator gen(12345);
+	raz::Random random(gen);
+
+	for (int i = 0; i < 10; ++i)
+		vector.push_back(random(1, 100));
+
+	for (int n : vector)
+		std::cout << n << ", ";
+	std::cout << std::endl;
+
+	return 0;
+}

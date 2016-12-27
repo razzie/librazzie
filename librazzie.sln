@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bitset", "examples\bitset\b
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "random", "examples\random\random.vcxproj", "{EA89B16C-3F2B-406A-B9B7-090081CAA718}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "memory", "examples\memory\memory.vcxproj", "{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -91,6 +93,14 @@ Global
 		{EA89B16C-3F2B-406A-B9B7-090081CAA718}.Release|x64.Build.0 = Release|x64
 		{EA89B16C-3F2B-406A-B9B7-090081CAA718}.Release|x86.ActiveCfg = Release|Win32
 		{EA89B16C-3F2B-406A-B9B7-090081CAA718}.Release|x86.Build.0 = Release|Win32
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Debug|x64.ActiveCfg = Debug|x64
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Debug|x64.Build.0 = Debug|x64
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Debug|x86.ActiveCfg = Debug|Win32
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Debug|x86.Build.0 = Debug|Win32
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Release|x64.ActiveCfg = Release|x64
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Release|x64.Build.0 = Release|x64
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Release|x86.ActiveCfg = Release|Win32
+		{201A31E7-7C2D-4F4F-AFA1-C61A89F0AADC}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
