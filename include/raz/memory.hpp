@@ -21,6 +21,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #pragma once
 
+#include <mutex>
+#include <type_traits>
 #include "raz/bitset.hpp"
 
 namespace raz
@@ -33,7 +35,7 @@ namespace raz
 		virtual void  deallocate(void* ptr, size_t bytes) = 0;
 	};
 
-	template<size_t SIZE, size_t ALIGNMENT = 128>
+	template<size_t SIZE, size_t ALIGNMENT = 128, class Mutex = std::mutex>
 	class MemoryPool : public IMemoryPool
 	{
 		static_assert(SIZE % ALIGNMENT == 0, "Incorrect alignment");
@@ -45,6 +47,8 @@ namespace raz
 
 		virtual void* allocate(size_t bytes)
 		{
+			std::lock_guard<Lock> guard(m_lock);
+
 			auto available = m_chunks.falsebits();
 			auto begin_iter = available.begin();
 			auto end_iter = available.end();
@@ -52,7 +56,7 @@ namespace raz
 			if (begin_iter == end_iter)
 				throw std::bad_alloc();
 
-			const size_t chunks = ((bytes - 1) / (ALIGNMENT)) + 1;
+			const size_t chunks = ((bytes - 1) / ALIGNMENT) + 1;
 			size_t current_chunk_pos = *begin_iter;
 			size_t current_chunk_size = 0;
 
@@ -82,7 +86,9 @@ namespace raz
 
 		virtual void deallocate(void* ptr, size_t bytes)
 		{
-			const size_t chunks = ((bytes - 1) / (ALIGNMENT)) + 1;
+			std::lock_guard<Lock> guard(m_lock);
+
+			const size_t chunks = ((bytes - 1) / ALIGNMENT) + 1;
 			const size_t starting_chunk = (static_cast<char*>(ptr) - m_memory) / ALIGNMENT;
 
 			for (size_t i = starting_chunk; i < starting_chunk + chunks; ++i)
@@ -92,7 +98,16 @@ namespace raz
 		}
 
 	private:
+		struct DummyMutex
+		{
+			void lock() {};
+			void unlock() {};
+		};
+
+		typedef std::conditional_t<std::is_same<Mutex, void>::value, DummyMutex, Mutex> Lock;
+
 		Bitset<SIZE / ALIGNMENT> m_chunks;
+		Lock m_lock;
 		char m_memory[SIZE];
 	};
 
