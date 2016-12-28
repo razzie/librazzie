@@ -33,6 +33,8 @@ namespace raz
 		virtual ~IMemoryPool() = default;
 		virtual void* allocate(size_t bytes) = 0;
 		virtual void  deallocate(void* ptr, size_t bytes) = 0;
+		virtual size_t getFreeMemory() const = 0;
+		virtual size_t getUsedMemory() const = 0;
 	};
 
 	template<size_t SIZE, size_t ALIGNMENT = 128, class Mutex = std::mutex>
@@ -95,6 +97,16 @@ namespace raz
 			{
 				m_chunks.unset(i);
 			}
+		}
+
+		virtual size_t getFreeMemory() const
+		{
+			return (m_chunks.falsebits().count() * ALIGNMENT);
+		}
+
+		virtual size_t getUsedMemory() const
+		{
+			return (m_chunks.truebits().count() * ALIGNMENT);
 		}
 
 	private:
