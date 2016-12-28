@@ -265,9 +265,9 @@ namespace raz
 				size_t count = 0;
 
 				for (size_t i = 0; i < DATA_SIZE; ++i)
-					count += countFalseBits(m_bitset->m_data[i]);
+					count += countTrueBits(m_bitset->m_data[i]);
 
-				return N - count;
+				return (N - count);
 			}
 
 			FalseBitIterator begin() const
