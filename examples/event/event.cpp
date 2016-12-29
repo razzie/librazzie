@@ -43,13 +43,9 @@ struct FooEventReceiver : public FooEvent::Callback
 
 void example01()
 {
-	raz::EventSystem<FooEvent, BarEvent> event_handler;
-	raz::EventQueueSystem<FooEvent, BarEvent> event_queue;
-
-	FooEventReceiver r(event_handler.access<FooEventReceiver>());
-
-	event_queue.enqueue<"foo"_event>("razzie", 99);
-	event_queue.dequeue(event_handler);
+	FooEvent::CallbackSystem foo_callbacks;
+	FooEventReceiver r(foo_callbacks);
+	foo_callbacks.handle(FooEvent("razzie", 99));
 }
 
 void example02()
@@ -64,10 +60,22 @@ void example02()
 	event_handler.handle(e);
 }
 
+void example03()
+{
+	raz::EventSystem<FooEvent, BarEvent> event_handler;
+	raz::EventQueueSystem<FooEvent, BarEvent> event_queue;
+
+	FooEventReceiver r(event_handler.access<FooEventReceiver>());
+
+	event_queue.enqueue<"foo"_event>("razzie", 99);
+	event_queue.dequeue(event_handler);
+}
+
 int main()
 {
 	example01();
 	example02();
+	example03();
 
 	return 0;
 }
