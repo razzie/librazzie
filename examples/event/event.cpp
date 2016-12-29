@@ -23,30 +23,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <string>
 #include "raz/event.hpp"
 
-//#define USE_EVENT_DISPATCHER
-
 using namespace raz::literal; // for the _event literal operator
 
 typedef raz::Event<"foo"_event, std::string, int> FooEvent;
 typedef raz::Event<"bar"_event, float> BarEvent;
 
-// this example shows two possible approaches:
-#ifdef USE_EVENT_DISPATCHER // either you use EventDispatcher
-FooEvent::CallbackSystem foo_callbacks;
-BarEvent::CallbackSystem bar_callbacks;
-raz::EventDispatcher<FooEvent, BarEvent> event_dispatcher(foo_callbacks, bar_callbacks);
-#else // or EventSystem
-raz::EventSystem<FooEvent, BarEvent> event_system;
-#endif
-
 struct FooEventReceiver : public FooEvent::Callback
 {
-	FooEventReceiver() :
-#ifdef USE_EVENT_DISPATCHER
-		FooEvent::Callback(foo_callbacks, &FooEventReceiver::receive)
-#else
-		FooEvent::Callback(event_system.getSystemByCallback(this), &FooEventReceiver::receive)
-#endif
+	FooEventReceiver(FooEvent::CallbackSystem& system) :
+		FooEvent::Callback(system, &FooEventReceiver::receive)
 	{
 	}
 
@@ -56,15 +41,33 @@ struct FooEventReceiver : public FooEvent::Callback
 	}
 };
 
+void example01()
+{
+	raz::EventSystem<FooEvent, BarEvent> event_handler;
+	raz::EventQueueSystem<FooEvent, BarEvent> event_queue;
+
+	FooEventReceiver r(event_handler.access<FooEventReceiver>());
+
+	event_queue.enqueue<"foo"_event>("razzie", 99);
+	event_queue.dequeue(event_handler);
+}
+
+void example02()
+{
+	FooEvent::CallbackSystem foo_callbacks;
+	BarEvent::CallbackSystem bar_callbacks;
+	raz::EventDispatcher<FooEvent, BarEvent> event_handler(foo_callbacks, bar_callbacks);
+
+	FooEventReceiver r(foo_callbacks);
+
+	FooEvent e("razzie", 99);
+	event_handler.handle(e);
+}
+
 int main()
 {
-	FooEventReceiver r;
-	FooEvent e("razzie", 99);
-#ifdef USE_EVENT_DISPATCHER
-	event_dispatcher.handle(e);
-#else
-	event_system.handle(e);
-#endif
+	example01();
+	example02();
 
 	return 0;
 }
