@@ -22,6 +22,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #pragma once
 
 #include <vector>
+#include "raz/memory.hpp"
 
 namespace raz
 {
@@ -71,7 +72,16 @@ namespace raz
 	class CallbackSystem
 	{
 	public:
-		CallbackSystem() : m_handling_recursion(0)
+		CallbackSystem() :
+			m_handling_recursion(0)
+		{
+		}
+
+		CallbackSystem(IMemoryPool& memory) :
+			m_callbacks(memory),
+			m_inserted_callbacks(memory),
+			m_removed_callbacks(memory),
+			m_handling_recursion(0)
 		{
 		}
 
@@ -119,9 +129,11 @@ namespace raz
 		}
 
 	private:
-		std::vector<Callback<T>*> m_callbacks;
-		std::vector<Callback<T>*> m_inserted_callbacks;
-		std::vector<Callback<T>*> m_removed_callbacks;
+		typedef std::vector<Callback<T>*, raz::Allocator<Callback<T>*>> CallbackContainer;
+
+		CallbackContainer m_callbacks;
+		CallbackContainer m_inserted_callbacks;
+		CallbackContainer m_removed_callbacks;
 		int m_handling_recursion;
 
 		void processInsertecCallbacks()
