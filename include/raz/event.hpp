@@ -51,11 +51,15 @@ namespace raz
 		public:
 			CallbackSystem() = default;
 
-			CallbackSystem(IMemoryPool& memory) : raz::CallbackSystem<Event>(memory)
+			CallbackSystem(IMemoryPool& memory) :
+				raz::CallbackSystem<Event>(memory)
 			{
 			}
 
-			CallbackSystem(const CallbackSystem&) = delete;
+			CallbackSystem(CallbackSystem&& other) :
+				raz::CallbackSystem<Event>(other)
+			{
+			}
 
 			static constexpr EventType getEventType()
 			{
