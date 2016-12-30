@@ -420,7 +420,7 @@ namespace raz
 		}
 
 		EventSystem(EventSystem&& other) :
-			EventDispatcher(other),
+			EventDispatcher(std::get<typename Events::CallbackSystem>(m_callback_systems)...)
 			m_callback_systems(std::move(other.m_callback_systems))
 		{
 		}
