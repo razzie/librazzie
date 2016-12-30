@@ -338,64 +338,62 @@ namespace raz
 		{
 		}
 
-		EventDispatcher(const EventDispatcher&) = delete;
+		EventDispatcher(const EventDispatcher& other) :
+			m_callback_systems(other.m_callback_systems)
+		{
+		}
 
 		template<class Event>
 		void handle(const Event& e)
 		{
-			_handle<Event, 0, Events...>(e);
+			_handle<0>(e);
 		}
 
 		template<class Serializer>
 		void handleSerialized(EventType type, Serializer& s)
 		{
-			_handleSerialized<Serializer, 0, Events...>(type, s);
-		}
-
-	protected:
-		EventDispatcher(std::tuple<typename Events::CallbackSystem*...> callback_systems) :
-			m_callback_systems(callback_systems)
-		{
+			_handleSerialized<0>(type, s);
 		}
 
 	private:
 		std::tuple<typename Events::CallbackSystem*...> m_callback_systems;
 
-		template<class Event, size_t N>
-		void _handle(const Event&)
+		void _handle(...)
 		{
 		}
 
-		template<class Event, size_t N, class RegEvent0, class... RegEvents>
-		std::enable_if_t<std::is_same<Event, RegEvent0>::value>
-			_handle(const Event& e)
+		template<class CallbackSystem, class Event>
+		auto _handle(CallbackSystem* handler, const Event& e) -> decltype(handler->handle(e))
 		{
-			auto cb = std::get<N>(m_callback_systems);
-			cb->handle(e);
-
-			_handle<Event, N + 1, RegEvents...>(e);
+			handler->handle(e);
 		}
 
-		template<class Event, size_t N, class RegEvent0, class... RegEvents>
-		std::enable_if_t<!std::is_same<Event, RegEvent0>::value>
-			_handle(const Event& e)
+		template<size_t N, class Event>
+		std::enable_if_t<(N < sizeof...(Events))> _handle(const Event& e)
 		{
-			_handle<Event, N + 1, RegEvents...>(e);
+			auto handler = std::get<N>(m_callback_systems);
+			if (handler->getEventType() == e.getType())
+				_handle(handler, e);
 		}
 
-		template<class Serializer, size_t N>
-		void _handleSerialized(EventType, Serializer&)
+		template<size_t N, class Event>
+		std::enable_if_t<(N >= sizeof...(Events))> _handle(const Event&)
 		{
 		}
 
-		template<class Serializer, size_t N, class RegEvent0, class... RegEvents>
-		void _handleSerialized(EventType type, Serializer& s)
+		template<size_t N, class Serializer>
+		std::enable_if_t<(N < sizeof...(Events))> _handleSerialized(EventType type, Serializer& s)
 		{
-			auto cb = std::get<N>(m_callback_systems);
-			if (cb->getEventType() == type)
-				cb->handleSerialized<Serializer>(s);
+			auto handler = std::get<N>(m_callback_systems);
+			if (handler->getEventType() == type)
+				handler->handleSerialized<Serializer>(s);
 
-			_handleSerialized<Serializer, N + 1, RegEvents...>(type, s);
+			_handleSerialized<N + 1>(type, s);
+		}
+
+		template<size_t N, class Serializer>
+		std::enable_if_t<(N >= sizeof...(Events))> _handleSerialized(EventType, Serializer&)
+		{
 		}
 	};
 
@@ -404,12 +402,12 @@ namespace raz
 	{
 	public:
 		EventSystem() :
-			EventDispatcher(getCallbackSystemPointers())
+			EventDispatcher(std::get<typename Events::CallbackSystem>(m_callback_systems)...)
 		{
 		}
 
 		EventSystem(IMemoryPool& memory) :
-			EventDispatcher(getCallbackSystemPointers()),
+			EventDispatcher(std::get<typename Events::CallbackSystem>(m_callback_systems)...)
 			m_callback_systems( (sizeof(Events), memory)... )
 		{
 		}
@@ -430,16 +428,5 @@ namespace raz
 
 	private:
 		std::tuple<typename Events::CallbackSystem...> m_callback_systems;
-
-		template<size_t... I>
-		std::tuple<typename Events::CallbackSystem*...> getCallbackSystemPointers(std::index_sequence<I...>)
-		{
-			return std::tuple<typename Events::CallbackSystem*...>((&std::get<I>(m_callback_systems))...);
-		}
-
-		std::tuple<typename Events::CallbackSystem*...> getCallbackSystemPointers()
-		{
-			return getCallbackSystemPointers(std::make_index_sequence<sizeof...(Events)>());
-		}
 	};
 }
