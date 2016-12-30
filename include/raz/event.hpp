@@ -226,7 +226,10 @@ namespace raz
 		{
 		}
 
-		EventQueueSystem(const EventQueueSystem&) = delete;
+		EventQueueSystem(EventQueueSystem&& other) :
+			m_queues(std::move(other.m_queues))
+		{
+		}
 
 		template<EventType Type, class... Params>
 		void enqueue(Params... params)
@@ -412,7 +415,11 @@ namespace raz
 		{
 		}
 
-		EventSystem(const EventSystem&) = delete;
+		EventSystem(EventSystem&& other) :
+			EventDispatcher(other),
+			m_callback_systems(std::move(other.m_callback_systems))
+		{
+		}
 
 		template<class Event>
 		typename Event::CallbackSystem& access(Event* = nullptr)
