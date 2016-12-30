@@ -85,12 +85,23 @@ namespace raz
 		{
 		}
 
-		CallbackSystem(const CallbackSystem& other) = delete;
+		CallbackSystem(CallbackSystem&& other)
+		{
+			other.processInsertedCallbacks();
+			other.processRemovedCallbacks();
+
+			m_callbacks = std::move(other.m_callbacks);
+
+			for (auto callback : m_callbacks)
+			{
+				callback->m_system = this;
+			}
+		}
 
 		~CallbackSystem()
 		{
-			processInsertecCallbacks();
-			processInsertecCallbacks();
+			processInsertedCallbacks();
+			processRemovedCallbacks();
 
 			for (auto callback : m_callbacks)
 			{
@@ -103,8 +114,8 @@ namespace raz
 			if (m_handling_recursion == 0)
 			{
 				++m_handling_recursion;
-				processInsertecCallbacks();
-				processInsertecCallbacks();
+				processInsertedCallbacks();
+				processRemovedCallbacks();
 			}
 
 			for (auto callback : m_callbacks)
@@ -136,7 +147,7 @@ namespace raz
 		CallbackContainer m_removed_callbacks;
 		int m_handling_recursion;
 
-		void processInsertecCallbacks()
+		void processInsertedCallbacks()
 		{
 			m_callbacks.insert(m_callbacks.end(), m_inserted_callbacks.begin(), m_inserted_callbacks.end());
 			m_inserted_callbacks.clear();
