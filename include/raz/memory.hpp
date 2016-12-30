@@ -135,43 +135,56 @@ namespace raz
 			typedef Allocator<U> other;
 		};
 
+		Allocator() : m_memory(nullptr)
+		{
+		}
+
 		Allocator(IMemoryPool& memory) : m_memory(&memory)
 		{
 		}
 
 		template<class U>
-		Allocator(const Allocator<U>& other) : m_memory(&other.getMemoryPool())
+		Allocator(const Allocator<U>& other) : m_memory(other.m_memory)
 		{
 		}
 
 		T* allocate(size_t n)
 		{
-			return reinterpret_cast<T*>(m_memory->allocate(n * sizeof(T)));
+			if (m_memory)
+				return reinterpret_cast<T*>(m_memory->allocate(n * sizeof(T)));
+			else
+				return reinterpret_cast<T*>(::operator new(n * sizeof(T)));
 		}
 
 		void deallocate(T* ptr, size_t n)
 		{
-			m_memory->deallocate(ptr, n * sizeof(T));
+			if (m_memory)
+				m_memory->deallocate(ptr, n * sizeof(T));
+			else
+				delete reinterpret_cast<void*>(ptr);
 		}
 
-		IMemoryPool& getMemoryPool() const
+		IMemoryPool* getMemoryPool() const
 		{
-			return *m_memory;
+			return m_memory;
 		}
 
 		template<class U>
 		bool operator==(const Allocator<U>& other) const
 		{
-			return (m_memory == &other.getMemoryPool());
+			return (m_memory == other.m_memory);
 		}
 
 		template<class U>
 		bool operator!=(const Allocator<U>& other) const
 		{
-			return (m_memory != &other.getMemoryPool());
+			return (m_memory != other.m_memory);
 		}
 
 	private:
 		mutable IMemoryPool* m_memory;
+
+		template<class U>
+		friend class Allocator;
 	};
 }

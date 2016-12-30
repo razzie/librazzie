@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <tuple>
 #include <utility>
 #include "raz/callback.hpp"
+#include "raz/memory.hpp"
 #include "raz/serialization.hpp"
 
 namespace raz
@@ -48,6 +49,14 @@ namespace raz
 		class CallbackSystem : public raz::CallbackSystem<Event>
 		{
 		public:
+			CallbackSystem() = default;
+
+			CallbackSystem(IMemoryPool& memory) : raz::CallbackSystem<Event>(memory)
+			{
+			}
+
+			CallbackSystem(const CallbackSystem&) = delete;
+
 			static constexpr EventType getEventType()
 			{
 				return Event::getType();
@@ -150,6 +159,10 @@ namespace raz
 	public:
 		EventQueue() = default;
 
+		EventQueue(IMemoryPool& memory) : m_queue(memory)
+		{
+		}
+
 		EventQueue(EventQueue&& other) : m_queue(std::move(other.m_queue))
 		{
 		}
@@ -199,7 +212,7 @@ namespace raz
 
 	private:
 		std::recursive_mutex m_lock;
-		std::deque<Event> m_queue;
+		std::deque<Event, raz::Allocator<Event>> m_queue;
 	};
 
 	template<class... Events>
@@ -207,6 +220,12 @@ namespace raz
 	{
 	public:
 		EventQueueSystem() = default;
+
+		EventQueueSystem(IMemoryPool& memory) :
+			m_queues( (sizeof(Events), memory)... )
+		{
+		}
+
 		EventQueueSystem(const EventQueueSystem&) = delete;
 
 		template<EventType Type, class... Params>
@@ -386,6 +405,12 @@ namespace raz
 	public:
 		EventSystem() :
 			EventDispatcher(getCallbackSystemPointers())
+		{
+		}
+
+		EventSystem(IMemoryPool& memory) :
+			EventDispatcher(getCallbackSystemPointers()),
+			m_callback_systems( (sizeof(Events), memory)... )
 		{
 		}
 

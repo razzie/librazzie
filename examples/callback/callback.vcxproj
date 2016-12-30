@@ -124,7 +124,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\raz\bitset.hpp" />
     <ClInclude Include="..\..\include\raz\callback.hpp" />
+    <ClInclude Include="..\..\include\raz\memory.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="callback.cpp" />
