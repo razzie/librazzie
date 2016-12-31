@@ -34,19 +34,13 @@ namespace raz
 	{
 	public:
 		typedef T ValueType;
-		typedef void(Callback::*Handler)(const T&); // should be a member function of derived class
 
-		template<class Derived>
-		Callback(CallbackSystem<T>& system, void(Derived::*handler)(const T&)) :
-			m_system(&system),
-			m_handler(static_cast<Handler>(handler))
+		Callback(CallbackSystem<T>& system) : m_system(&system)
 		{
 			m_system->bind(this);
 		}
 
-		Callback(const Callback& other) :
-			m_system(other.m_system),
-			m_handler(other.m_handler)
+		Callback(const Callback& other) : m_system(other.m_system)
 		{
 			if (m_system) m_system->bind(this);
 		}
@@ -56,16 +50,12 @@ namespace raz
 			if (m_system) m_system->unbind(this);
 		}
 
-		void handle(const T& t)
-		{
-			(*this.*m_handler)(t);
-		}
+		virtual void handle(const T& t) = 0;
 
 	private:
 		friend class CallbackSystem<T>;
 
 		CallbackSystem<T>* m_system;
-		Handler m_handler;
 	};
 
 	template<class T>
@@ -85,12 +75,14 @@ namespace raz
 		{
 		}
 
-		CallbackSystem(CallbackSystem&& other)
+		CallbackSystem(CallbackSystem&& other) :
+			m_callbacks(std::move(other.m_callbacks)),
+			m_inserted_callbacks(std::move(other.m_inserted_callbacks)),
+			m_removed_callbacks(std::move(other.m_removed_callbacks))
+			m_handling_recursion(0)
 		{
-			other.processInsertedCallbacks();
-			other.processRemovedCallbacks();
-
-			m_callbacks = std::move(other.m_callbacks);
+			processInsertedCallbacks();
+			processRemovedCallbacks();
 
 			for (auto callback : m_callbacks)
 			{

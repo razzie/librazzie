@@ -24,29 +24,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 struct Foo
 {
-	int value;
+	int bar;
 };
 
-raz::CallbackSystem<Foo> foo_subscribers;
+raz::CallbackSystem<Foo> foo_callbacks;
 
-struct FooReceiver : public raz::Callback<Foo>
+struct FooCallback : public raz::Callback<Foo>
 {
-	FooReceiver() : Callback<Foo>(foo_subscribers, &FooReceiver::receive)
+	FooCallback() : Callback<Foo>(foo_callbacks)
 	{
 	}
 
-	void receive(const Foo& foo)
+	virtual void handle(const Foo& foo) // inherited from Callback<Foo>
 	{
-		std::cout << foo.value << std::endl;
+		std::cout << foo.bar << std::endl;
 	}
 };
 
 int main()
 {
-	FooReceiver r;
+	FooCallback r;
 	Foo f = { 123 };
 
-	foo_subscribers.handle(f);
+	foo_callbacks.handle(f);
 
 	return 0;
 }

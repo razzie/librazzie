@@ -28,14 +28,14 @@ using namespace raz::literal; // for the _event literal operator
 typedef raz::Event<"foo"_event, std::string, int> FooEvent;
 typedef raz::Event<"bar"_event, float> BarEvent;
 
-struct FooEventReceiver : public FooEvent::Callback
+struct FooEventCallback : public FooEvent::Callback
 {
-	FooEventReceiver(FooEvent::CallbackSystem& system) :
-		FooEvent::Callback(system, &FooEventReceiver::receive)
+	FooEventCallback(FooEvent::CallbackSystem& system) :
+		FooEvent::Callback(system)
 	{
 	}
 
-	void receive(const FooEvent& e)
+	virtual void handle(const FooEvent& e) // inherited from FooEvent::Callback
 	{
 		std::cout << e.get<0>() << " - " << e.get<1>() << std::endl;
 	}
@@ -44,7 +44,9 @@ struct FooEventReceiver : public FooEvent::Callback
 void example01()
 {
 	FooEvent::CallbackSystem foo_callbacks;
-	FooEventReceiver r(foo_callbacks);
+
+	FooEventCallback r(foo_callbacks);
+
 	foo_callbacks.handle(FooEvent("razzie", 99));
 }
 
@@ -54,7 +56,7 @@ void example02()
 	BarEvent::CallbackSystem bar_callbacks;
 	raz::EventDispatcher<FooEvent, BarEvent> event_handler(foo_callbacks, bar_callbacks);
 
-	FooEventReceiver r(foo_callbacks);
+	FooEventCallback r(foo_callbacks);
 
 	FooEvent e("razzie", 99);
 	event_handler.handle(e);
@@ -65,7 +67,7 @@ void example03()
 	raz::EventSystem<FooEvent, BarEvent> event_handler;
 	raz::EventQueueSystem<FooEvent, BarEvent> event_queue;
 
-	FooEventReceiver r(event_handler.access<FooEventReceiver>());
+	FooEventCallback r(event_handler.access<FooEventCallback>());
 
 	event_queue.enqueue<"foo"_event>("razzie", 99);
 	event_queue.dequeue(event_handler);
