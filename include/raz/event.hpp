@@ -67,23 +67,24 @@ namespace raz
 			}
 
 			template<class Serializer>
-			void handleSerialized(Serializer& s)
+			raz::EnableSerializer<Serializer> handleSerialized(Serializer& serializer)
 			{
-				Event e(s);
-				(*this)(e);
+				Event e(serializer);
+				this->handle(e);
 			}
 		};
 
 		template<class _, class Serializer = EnableSerializer<_>>
-		Event(Serializer& s) : std::tuple<Params...>()
+		Event(Serializer& serializer)
 		{
-			if (s.getMode() == ISerializer::Mode::DESERIALIZE)
-				serialize(s);
+			if (serializer.getMode() == ISerializer::Mode::DESERIALIZE)
+				_serialize<0>(serializer);
 			else
 				throw SerializationError();
 		}
 
-		Event(Params... params) : std::tuple<Params...>(std::forward<Params>(params)...)
+		Event(Params... params) :
+			std::tuple<Params...>(std::forward<Params>(params)...)
 		{
 		}
 
@@ -128,18 +129,23 @@ namespace raz
 			tag = &get<N>();
 		}
 
-		template<class _, class Serializer = EnableSerializer<_>>
-		void operator()(Serializer& s)
+		template<class Serializer>
+		raz::EnableSerializer<Serializer> operator()(Serializer& serializer)
 		{
-			serialize(s);
+			_serialize<0>(serializer);
 		}
 
 	private:
-		template<class Serializer, size_t N = 0>
-		void serialize(Serializer& s)
+		template<size_t N, class Serializer>
+		std::enable_if_t<(N < sizeof...(Params))> _serialize(Serializer& serializer)
 		{
-			s(get<N>());
-			if (N < sizeof...(Params)) serialize<Serializer, N + 1>(s);
+			serializer(get<N>());
+			_serialize<N + 1>(serializer);
+		}
+
+		template<size_t N, class Serializer>
+		std::enable_if_t<(N >= sizeof...(Params))> _serialize(Serializer&)
+		{
 		}
 	};
 
@@ -337,10 +343,10 @@ namespace raz
 
 
 	template<class... Events>
-	class EventDispatcher // the given event callback systems must always live longer
+	class EventDispatcher
 	{
 	public:
-		EventDispatcher(typename Events::CallbackSystem&... callback_system) :
+		EventDispatcher(typename Events::CallbackSystem&... callback_system) : // CallbackSystem references must not become invalid
 			m_callback_systems((&callback_system)...)
 		{
 		}
