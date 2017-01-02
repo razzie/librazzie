@@ -70,7 +70,7 @@ namespace raz
 			raz::EnableSerializer<Serializer> handleSerialized(Serializer& serializer)
 			{
 				Event e(serializer);
-				this->handle(e);
+				handle(e);
 			}
 		};
 
@@ -189,6 +189,13 @@ namespace raz
 			m_queue.emplace_back(std::forward<Params>(params)...);
 		}
 
+		template<class Serializer>
+		raz::EnableSerializer<Serializer> enqueueSerialized(Serializer& serializer)
+		{
+			std::lock_guard<decltype(m_lock)> guard(m_lock);
+			m_queue.emplace_back(serializer);
+		}
+
 		template<class Handler>
 		void dequeue(Handler& handler)
 		{
@@ -248,7 +255,7 @@ namespace raz
 		}
 
 		template<class Serializer>
-		void enqueueSerialized(EventType type, Serializer& serializer)
+		raz::EnableSerializer<Serializer> enqueueSerialized(EventType type, Serializer& serializer)
 		{
 			_enqueueSerialized<0>(type, serializer);
 		}
@@ -296,7 +303,7 @@ namespace raz
 		{
 			auto& queue = std::get<N>(m_queues);
 			if (queue.getEventType() == type)
-				queue.enqueueSerialized(type, serializer);
+				queue.enqueueSerialized(serializer);
 
 			_enqueueSerialized<N + 1>(type, serializer);
 		}
@@ -363,7 +370,7 @@ namespace raz
 		}
 
 		template<class Serializer>
-		void handleSerialized(EventType type, Serializer& s)
+		raz::EnableSerializer<Serializer> handleSerialized(EventType type, Serializer& s)
 		{
 			_handleSerialized<0>(type, s);
 		}
