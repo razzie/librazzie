@@ -26,7 +26,7 @@ int main()
 {
 	uint64_t seed = 12345;
 	raz::RandomGenerator gen(seed);
-	raz::RandomDistribution<raz::RandomGenerator> random(gen);
+	raz::RandomDistributor<raz::RandomGenerator> random(gen);
 
 	std::cout << "Generating some random integers in range [1..100]:" << std::endl;
 	for (int i = 0; i < 10; ++i)

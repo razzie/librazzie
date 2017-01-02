@@ -29,8 +29,7 @@ int main()
 	raz::MemoryPool<1024, sizeof(int)> mem;
 	std::vector<int, raz::Allocator<int>> vector(mem);
 
-	raz::RandomGenerator gen(12345);
-	raz::Random random(gen);
+	raz::Random random(12345);
 
 	for (int i = 0; i < 10; ++i)
 		vector.push_back(random(1, 100));
