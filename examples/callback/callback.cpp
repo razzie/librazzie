@@ -24,29 +24,56 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 struct Foo
 {
-	int bar;
+	int value;
+};
+
+struct Bar
+{
+	float value;
 };
 
 raz::CallbackSystem<Foo> foo_callbacks;
+raz::CallbackSystem<Bar> bar_callbacks;
 
 struct FooCallback : public raz::Callback<Foo>
 {
-	FooCallback() : Callback<Foo>(foo_callbacks)
+	FooCallback() :
+		Callback<Foo>(foo_callbacks)
 	{
 	}
 
 	virtual void handle(const Foo& foo) // inherited from Callback<Foo>
 	{
-		std::cout << foo.bar << std::endl;
+		std::cout << "FooCallback - foo: " << foo.value << std::endl;
+	}
+};
+
+struct FooBarCallback : public raz::Callback<Foo>, public raz::Callback<Bar>
+{
+	FooBarCallback() :
+		Callback<Foo>(foo_callbacks),
+		Callback<Bar>(bar_callbacks)
+	{
+	}
+
+	virtual void handle(const Foo& foo) // inherited from Callback<Foo>
+	{
+		std::cout << "FooBarCallback - foo: " << foo.value << std::endl;
+	}
+
+	virtual void handle(const Bar& bar) // inherited from Callback<Bar>
+	{
+		std::cout << "FooBarCallback - bar: " << bar.value << std::endl;
 	}
 };
 
 int main()
 {
-	FooCallback r;
-	Foo f = { 123 };
+	FooCallback foo;
+	FooBarCallback foobar;
 
-	foo_callbacks.handle(f);
+	foo_callbacks.handle(Foo{ 123 });
+	bar_callbacks.handle(Bar{ 1.23f });
 
 	return 0;
 }
