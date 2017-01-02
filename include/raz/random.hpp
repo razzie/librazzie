@@ -55,6 +55,12 @@ namespace raz
 		{
 		}
 
+		RandomGenerator& operator=(const RandomGenerator& other)
+		{
+			m_state = other.m_state;
+			return *this;
+		}
+
 		void seed(result_type value = default_seed)
 		{
 			m_state[0] = value;
@@ -138,22 +144,27 @@ namespace raz
 	};
 
 	template<class Generator>
-	class RandomDistribution
+	class RandomDistributor
 	{
 	public:
-		RandomDistribution(Generator& generator) :
-			m_generator(generator)
+		RandomDistributor(Generator& generator) :
+			m_generator(&generator)
 		{
 		}
 
-		RandomDistribution(const RandomDistribution&) = delete;
+		RandomDistributor(const RandomDistributor& other) :
+			m_generator(other.m_generator)
+		{
+		}
+
+		RandomDistributor& operator=(const RandomDistributor& other) = default;
 
 		template<class IntType>
 		std::enable_if_t<std::is_integral<IntType>::value, IntType>
 			operator()(IntType min_value, IntType max_value)
 		{
 			std::uniform_int_distribution<IntType> dist(min_value, max_value);
-			return dist(m_generator);
+			return dist(*m_generator);
 		}
 
 		template<class RealType>
@@ -161,12 +172,39 @@ namespace raz
 			operator()(RealType min_value, RealType max_value)
 		{
 			std::uniform_real_distribution<RealType> dist(min_value, max_value);
-			return dist(m_generator);
+			return dist(*m_generator);
 		}
 
 	private:
-		Generator& m_generator;
+		Generator* m_generator;
 	};
 
-	typedef RandomDistribution<RandomGenerator> Random;
+	class Random : public RandomGenerator, public RandomDistributor<RandomGenerator>
+	{
+	public:
+		Random(result_type value = default_seed) :
+			RandomGenerator(value),
+			RandomDistributor<RandomGenerator>(*this)
+		{
+		}
+
+		template<class Sseq>
+		Random(Sseq& seq) :
+			RandomGenerator(seq),
+			RandomDistributor<RandomGenerator>(*this)
+		{
+		}
+
+		Random(const RandomGenerator& gen) :
+			RandomGenerator(gen),
+			RandomDistributor<RandomGenerator>(*this)
+		{
+		}
+
+		Random& operator=(const Random& other)
+		{
+			RandomGenerator::operator=(other);
+			return *this;
+		}
+	};
 }
