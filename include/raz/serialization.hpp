@@ -109,13 +109,14 @@ namespace raz
 			{
 				uint64_t tmp;
 				(*this)(tmp);
-				d = unpack754(tmp, 64, 11);
+				d = static_cast<double>(unpack754(tmp, 64, 11));
 			}
 
 			return *this;
 		}
 
-		Serializer& operator()(std::string& str)
+		template<class Allocator>
+		Serializer& operator()(std::basic_string<char, std::char_traits<char>, Allocator>& str)
 		{
 			if (BufferType::getMode() == SerializationMode::SERIALIZE)
 			{
@@ -244,8 +245,8 @@ namespace raz
 	template<class T>
 	class IsSerializer
 	{
-		template <typename U>
-		static std::true_type test(Serializer<U> const &);
+		template<class U, bool E>
+		static std::true_type test(Serializer<U, E> const &);
 
 		static std::false_type test(...);
 
