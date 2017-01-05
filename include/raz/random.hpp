@@ -201,7 +201,7 @@ namespace raz
 		{
 		}
 
-		Random& operator=(const Random& other)
+		Random& operator=(const RandomGenerator& other)
 		{
 			RandomGenerator::operator=(other);
 			return *this;
