@@ -20,7 +20,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 */
 
 #include <iostream>
-#include <sstream>
 #include "raz/stream.hpp"
 
 struct Foo
@@ -34,10 +33,9 @@ int main()
 		<< raz::HasStreamInserter<Foo>::value << "\n"
 		<< std::endl;
 
-	std::stringstream ss;
-	ss << raz::insert(123) << "\n" << raz::insert(Foo {});
+	std::cout << raz::insert(123) << "\n" << raz::insert(Foo{}) << "\n" << std::endl;
 
-	std::cout << ss.str() << std::endl;
+	std::cout << raz::format("%+.5f") << 1.23f << std::endl;
 
 	return 0;
 }
