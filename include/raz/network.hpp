@@ -54,7 +54,7 @@ namespace raz
 			Tail tail;
 		};
 
-		PacketBuffer(SerializationMode mode = SerializationMode::DESERIALIZE, PacketType type = 0) :
+		explicit PacketBuffer(SerializationMode mode = SerializationMode::DESERIALIZE, PacketType type = 0) :
 			m_mode(mode),
 			m_data_pos(0)
 		{

@@ -35,7 +35,7 @@ namespace raz
 	public:
 		typedef std::ios&(*Manipulator)(std::ios&, T);
 
-		StreamManipulator(Manipulator m, T t) :
+		explicit StreamManipulator(Manipulator m, T t) :
 			m_manip(m), m_value(t)
 		{
 		}
@@ -56,7 +56,7 @@ namespace raz
 	public:
 		typedef std::istream&(*Manipulator)(std::istream&, T);
 
-		IstreamManipulator(Manipulator m, T t) :
+		explicit IstreamManipulator(Manipulator m, T t) :
 			m_manip(m), m_value(t)
 		{
 		}
@@ -77,7 +77,7 @@ namespace raz
 	public:
 		typedef std::ostream&(*Manipulator)(std::ostream&, T);
 
-		OstreamManipulator(Manipulator m, T t) :
+		explicit OstreamManipulator(Manipulator m, T t) :
 			m_manip(m), m_value(t)
 		{
 		}

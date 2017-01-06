@@ -67,7 +67,7 @@ namespace raz
 		{
 		}
 
-		CallbackSystem(IMemoryPool& memory) :
+		explicit CallbackSystem(IMemoryPool& memory) :
 			m_callbacks(memory),
 			m_inserted_callbacks(memory),
 			m_removed_callbacks(memory),

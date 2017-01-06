@@ -51,7 +51,7 @@ namespace raz
 		public:
 			CallbackSystem() = default;
 
-			CallbackSystem(IMemoryPool& memory) :
+			explicit CallbackSystem(IMemoryPool& memory) :
 				raz::CallbackSystem<Event>(memory)
 			{
 			}
@@ -75,7 +75,7 @@ namespace raz
 		};
 
 		template<class _, class Serializer = EnableSerializer<_>>
-		Event(Serializer& serializer)
+		explicit Event(Serializer& serializer)
 		{
 			if (serializer.getMode() == ISerializer::Mode::DESERIALIZE)
 				_serialize<0>(serializer);
@@ -169,7 +169,7 @@ namespace raz
 	public:
 		EventQueue() = default;
 
-		EventQueue(IMemoryPool& memory) : m_queue(memory)
+		explicit EventQueue(IMemoryPool& memory) : m_queue(memory)
 		{
 		}
 
@@ -238,7 +238,7 @@ namespace raz
 	public:
 		EventQueueSystem() = default;
 
-		EventQueueSystem(IMemoryPool& memory) :
+		explicit EventQueueSystem(IMemoryPool& memory) :
 			m_queues( (sizeof(Events), memory)... )
 		{
 		}
@@ -426,7 +426,7 @@ namespace raz
 		{
 		}
 
-		EventSystem(IMemoryPool& memory) :
+		explicit EventSystem(IMemoryPool& memory) :
 			EventDispatcher(std::get<typename Events::CallbackSystem>(m_callback_systems)...)
 			m_callback_systems( (sizeof(Events), memory)... )
 		{
