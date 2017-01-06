@@ -40,6 +40,13 @@ namespace raz
 		{
 		}
 
+		Timer& operator=(const Timer& other)
+		{
+			m_start_time = other.m_start_time;
+			m_last_elapsed = other.m_last_elapsed;
+			return *this;
+		}
+
 		uint64_t getElapsed()
 		{
 			uint64_t elapsed_from_start =
