@@ -39,13 +39,13 @@ namespace raz
 		typedef uint64_t result_type;
 		static constexpr result_type default_seed = 1;
 		
-		RandomGenerator(result_type value = default_seed)
+		explicit RandomGenerator(result_type value = default_seed)
 		{
 			seed(value);
 		}
 
 		template<class Sseq>
-		RandomGenerator(Sseq& seq)
+		explicit RandomGenerator(Sseq& seq)
 		{
 			seed(seq);
 		}
@@ -147,7 +147,7 @@ namespace raz
 	class RandomDistributor
 	{
 	public:
-		RandomDistributor(Generator& generator) :
+		explicit RandomDistributor(Generator& generator) :
 			m_generator(&generator)
 		{
 		}
@@ -157,11 +157,7 @@ namespace raz
 		{
 		}
 
-		RandomDistributor& operator=(const RandomDistributor& other)
-		{
-			m_generator = other.m_generator;
-			return *this;
-		}
+		RandomDistributor& operator=(const RandomDistributor&) = delete;
 
 		template<class IntType>
 		std::enable_if_t<std::is_integral<IntType>::value, IntType>
@@ -186,14 +182,14 @@ namespace raz
 	class Random : public RandomGenerator, public RandomDistributor<RandomGenerator>
 	{
 	public:
-		Random(result_type value = default_seed) :
+		explicit Random(result_type value = default_seed) :
 			RandomGenerator(value),
 			RandomDistributor<RandomGenerator>(*static_cast<RandomGenerator*>(this))
 		{
 		}
 
 		template<class Sseq>
-		Random(Sseq& seq) :
+		explicit Random(Sseq& seq) :
 			RandomGenerator(seq),
 			RandomDistributor<RandomGenerator>(*static_cast<RandomGenerator*>(this))
 		{
