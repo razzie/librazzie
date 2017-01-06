@@ -157,7 +157,11 @@ namespace raz
 		{
 		}
 
-		RandomDistributor& operator=(const RandomDistributor& other) = default;
+		RandomDistributor& operator=(const RandomDistributor& other)
+		{
+			m_generator = other.m_generator;
+			return *this;
+		}
 
 		template<class IntType>
 		std::enable_if_t<std::is_integral<IntType>::value, IntType>
@@ -184,20 +188,20 @@ namespace raz
 	public:
 		Random(result_type value = default_seed) :
 			RandomGenerator(value),
-			RandomDistributor<RandomGenerator>(*this)
+			RandomDistributor<RandomGenerator>(*static_cast<RandomGenerator*>(this))
 		{
 		}
 
 		template<class Sseq>
 		Random(Sseq& seq) :
 			RandomGenerator(seq),
-			RandomDistributor<RandomGenerator>(*this)
+			RandomDistributor<RandomGenerator>(*static_cast<RandomGenerator*>(this))
 		{
 		}
 
 		Random(const RandomGenerator& gen) :
 			RandomGenerator(gen),
-			RandomDistributor<RandomGenerator>(*this)
+			RandomDistributor<RandomGenerator>(*static_cast<RandomGenerator*>(this))
 		{
 		}
 
@@ -206,5 +210,7 @@ namespace raz
 			RandomGenerator::operator=(gen);
 			return *this;
 		}
+
+		using RandomDistributor<RandomGenerator>::operator();
 	};
 }
