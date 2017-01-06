@@ -47,6 +47,8 @@ namespace raz
 		MemoryPool(const MemoryPool&) = delete;
 		~MemoryPool() = default;
 
+		MemoryPool& operator=(const MemoryPool&) = delete;
+
 		virtual void* allocate(size_t bytes)
 		{
 			std::lock_guard<Lock> guard(m_lock);
@@ -147,6 +149,8 @@ namespace raz
 		Allocator(const Allocator<U>& other) : m_memory(other.m_memory)
 		{
 		}
+
+		Allocator& operator=(const Allocator&) = delete;
 
 		T* allocate(size_t n)
 		{
