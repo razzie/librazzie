@@ -24,9 +24,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include "raz/memory.hpp"
 #include "raz/random.hpp"
 
+using namespace raz::literal;
+
 int main()
 {
-	raz::MemoryPool<1024, sizeof(int)> mem;
+	raz::MemoryPool<1_KB> mem;
 	std::vector<int, raz::Allocator<int>> vector(mem);
 
 	raz::Random random(12345);

@@ -191,4 +191,22 @@ namespace raz
 		template<class U>
 		friend class Allocator;
 	};
+
+	namespace literal
+	{
+		constexpr unsigned long long operator"" _KB(unsigned long long size)
+		{
+			return (size * 1024);
+		}
+
+		constexpr unsigned long long operator"" _MB(unsigned long long size)
+		{
+			return (size * 1024_KB);
+		}
+
+		constexpr unsigned long long operator"" _GB(unsigned long long size)
+		{
+			return (size * 1024_MB);
+		}
+	}
 }
