@@ -59,7 +59,7 @@ namespace raz
 			{
 				I tmp = i;
 
-				if (EndiannessConversion && !isBigEndian())
+				if (sizeof(I) > 1 && EndiannessConversion && !isBigEndian())
 					tmp = swapEndianness(tmp);
 
 				if (BufferType::write(reinterpret_cast<const char*>(&tmp), sizeof(I)) < sizeof(I))
@@ -72,7 +72,7 @@ namespace raz
 				if (BufferType::read(reinterpret_cast<char*>(&tmp), sizeof(I)) < sizeof(I))
 					throw SerializationError();
 
-				if (EndiannessConversion && !isBigEndian())
+				if (sizeof(I) > 1 && EndiannessConversion && !isBigEndian())
 					tmp = swapEndianness(tmp);
 
 				i = tmp;
