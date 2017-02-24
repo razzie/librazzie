@@ -29,7 +29,7 @@ using namespace raz::literal;
 int main()
 {
 	raz::MemoryPool<1_KB> mem;
-	std::vector<int, raz::Allocator<int>> vector(mem);
+	std::vector<int, raz::Allocator<int>> vector(&mem);
 
 	raz::Random random(12345);
 

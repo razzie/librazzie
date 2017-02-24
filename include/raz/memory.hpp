@@ -137,11 +137,7 @@ namespace raz
 			typedef Allocator<U> other;
 		};
 
-		Allocator() : m_memory(nullptr)
-		{
-		}
-
-		Allocator(IMemoryPool& memory) : m_memory(&memory)
+		Allocator(IMemoryPool* memory = nullptr) : m_memory(memory)
 		{
 		}
 
