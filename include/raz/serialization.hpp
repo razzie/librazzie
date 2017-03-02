@@ -21,8 +21,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 #include <type_traits>
 
 namespace raz
@@ -115,6 +117,13 @@ namespace raz
 			return *this;
 		}
 
+		template<class T, size_t N>
+		Serializer& operator()(std::array<T, N>& arr)
+		{
+			for (auto& t : arr)
+				(*this)(t);
+		}
+
 		template<class Allocator>
 		Serializer& operator()(std::basic_string<char, std::char_traits<char>, Allocator>& str)
 		{
@@ -132,8 +141,34 @@ namespace raz
 				(*this)(len);
 
 				str.resize(len);
+
 				if (BufferType::read(&str[0], len) < len)
 					throw SerializationError();
+			}
+
+			return *this;
+		}
+
+		template<class T, class Allocator>
+		Serializer& operator()(std::vector<T, Allocator>& vec)
+		{
+			if (BufferType::getMode() == SerializationMode::SERIALIZE)
+			{
+				uint32_t len = static_cast<uint32_t>(vec.size());
+				(*this)(len);
+
+				for (auto& t : vec)
+					(*this)(t);
+			}
+			else
+			{
+				uint32_t len;
+				(*this)(len);
+
+				vec.resize(vec.size() + len);
+
+				for (auto& t : vec)
+					(*this)(t);
 			}
 
 			return *this;
