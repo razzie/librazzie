@@ -151,12 +151,12 @@ namespace raz
 
 	namespace literal
 	{
-		static constexpr uint64_t stringhash(const char* str, const uint64_t h = 5381)
+		inline constexpr uint64_t stringhash(const char* str, const uint64_t h = 5381)
 		{
 			return (str[0] == 0) ? h : stringhash(&str[1], h * 33 + str[0]);
 		}
 
-		constexpr EventType operator"" _event(const char* evt, size_t)
+		inline constexpr EventType operator"" _event(const char* evt, size_t)
 		{
 			return (EventType)stringhash(evt);
 		}
@@ -167,9 +167,7 @@ namespace raz
 	class EventQueue
 	{
 	public:
-		EventQueue() = default;
-
-		explicit EventQueue(IMemoryPool& memory) : m_queue(memory)
+		EventQueue(IMemoryPool* memory = nullptr) : m_queue(memory)
 		{
 		}
 
@@ -236,9 +234,7 @@ namespace raz
 	class EventQueueSystem
 	{
 	public:
-		EventQueueSystem() = default;
-
-		explicit EventQueueSystem(IMemoryPool& memory) :
+		explicit EventQueueSystem(IMemoryPool* memory = nullptr) :
 			m_queues( (sizeof(Events), memory)... )
 		{
 		}
