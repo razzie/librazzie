@@ -207,6 +207,7 @@ namespace raz
 			return *this;
 		}
 
+		using RandomGenerator::operator();
 		using RandomDistributor<RandomGenerator>::operator();
 	};
 }
