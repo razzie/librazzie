@@ -21,6 +21,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #pragma once
 
+#include <exception>
 #include <functional>
 #include <future>
 #include <mutex>
@@ -64,10 +65,11 @@ namespace raz
 		std::mutex m_mutex;
 		std::list<ForwardedCall> m_call_queue;
 
+		template<class... Args>
 		class HasParenthesisOp
 		{
 			template<class U>
-			static auto test(bool) -> decltype(std::declval<U>()(), void(), std::true_type{})
+			static auto test(bool) -> decltype(std::declval<U>()(std::declval<Args>()...), void(), std::true_type{})
 			{
 				return {};
 			}
@@ -96,28 +98,53 @@ namespace raz
 		{
 		}
 
+		template<bool>
+		void error(T&, std::exception&);
+
+		template<>
+		void error<true>(T& object, std::exception& e)
+		{
+			object(e);
+		}
+
+		template<>
+		void error<false>(T& object, std::exception& e)
+		{
+		}
+
 		template<class... Args>
 		void run(Args... args)
 		{
-			T object(std::forward<Args>(args)...);
-			std::future<void> exit_token = m_exit_token.get_future();
-			std::list<ForwardedCall> call_queue;
+			char object_data[sizeof(T)];
 
-			for (;;)
+			try
 			{
-				m_mutex.lock();
-				std::swap(m_call_queue, call_queue);
-				m_mutex.unlock();
+				T* object = new (object_data) T(std::forward<Args>(args)...);
 
-				for (auto& call : call_queue)
-					call(object);
+				std::future<void> exit_token = m_exit_token.get_future();
+				std::list<ForwardedCall> call_queue;
 
-				call_queue.clear();
+				for (;;)
+				{
+					m_mutex.lock();
+					std::swap(m_call_queue, call_queue);
+					m_mutex.unlock();
 
-				loop<HasParenthesisOp::value>(object);
+					for (auto& call : call_queue)
+						call(*object);
 
-				auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
-				if (exit_status == std::future_status::ready) return;
+					call_queue.clear();
+
+					loop<HasParenthesisOp<>::value>(*object);
+
+					auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
+					if (exit_status == std::future_status::ready) return;
+				}
+			}
+			catch (std::exception& e)
+			{
+				// please note that this is unsafe if the exception was thrown during construction of T
+				error<HasParenthesisOp<std::exception&>::value>(*reinterpret_cast<T*>(object_data), e);
 			}
 		}
 	};
