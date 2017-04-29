@@ -34,10 +34,9 @@ namespace raz
 	{
 	public:
 		template<class... Args>
-		Thread(Args... args) :
-			m_object(std::forward<Args>(args)...)
+		Thread(Args... args)
 		{
-			m_thread = std::thread(&Thread<T>::run, this);
+			m_thread = std::thread(&Thread<T>::run<Args...>, this, std::forward<Args>(args)...);
 		}
 
 		Thread(const Thread&) = delete;
@@ -54,15 +53,16 @@ namespace raz
 		void operator()(Args... args)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
-			m_call_queue.emplace_back([this, args...]() { m_object(args...); });
+			m_call_queue.emplace_back([args...](T& object) { object(args...); });
 		}
 
 	private:
+		typedef std::function<void(T&)> ForwardedCall;
+
 		std::thread m_thread;
 		std::promise<void> m_exit_token;
 		std::mutex m_mutex;
-		std::list<std::function<void()>> m_call_queue;
-		T m_object;
+		std::list<ForwardedCall> m_call_queue;
 
 		class HasParenthesisOp
 		{
@@ -83,23 +83,25 @@ namespace raz
 		};
 
 		template<bool>
-		void loop();
+		void loop(T&);
 
 		template<>
-		void loop<true>()
+		void loop<true>(T& object)
 		{
-			m_object();
+			object();
 		}
 
 		template<>
-		void loop<false>()
+		void loop<false>(T& object)
 		{
 		}
 
-		void run()
+		template<class... Args>
+		void run(Args... args)
 		{
+			T object(std::forward<Args>(args)...);
 			std::future<void> exit_token = m_exit_token.get_future();
-			std::list<std::function<void()>> call_queue;
+			std::list<ForwardedCall> call_queue;
 
 			for (;;)
 			{
@@ -108,11 +110,11 @@ namespace raz
 				m_mutex.unlock();
 
 				for (auto& call : call_queue)
-					call();
+					call(object);
 
 				call_queue.clear();
 
-				loop<HasParenthesisOp::value>();
+				loop<HasParenthesisOp::value>(object);
 
 				auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
 				if (exit_status == std::future_status::ready) return;
