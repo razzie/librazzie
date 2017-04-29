@@ -20,21 +20,45 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 */
 
 #include <iostream>
+#include <stdexcept>
 #include "raz/thread.hpp"
 
-struct Loopable
+class Loopable
 {
+public:
 	void operator()()
 	{
 		std::cout << "loop" << std::endl;
 	}
 };
 
-struct Worker
+class Worker
 {
-	void operator()(int a, int b)
+	int base_value;
+
+public:
+	Worker(int base_value) : base_value(base_value)
 	{
-		std::cout << (a + b) << std::endl;
+	}
+
+	void operator()(int value)
+	{
+		std::cout << (base_value + value) << std::endl;
+	}
+};
+
+class WorkerWithException
+{
+public:
+	void operator()(bool throw_exception)
+	{
+		if (throw_exception)
+			throw std::runtime_error("this is an exception");
+	}
+
+	void operator()(std::exception& e)
+	{
+		std::cerr << e.what() << std::endl;
 	}
 };
 
@@ -46,15 +70,25 @@ void example01()
 
 void example02()
 {
-	raz::Thread<Worker> thread;
+	raz::Thread<Worker> thread(123);
 
-	thread(1, 2);
+	thread(1);
 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-	thread(2, 3);
+	thread(2);
 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-	thread(3, 4);
+	thread(3);
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+}
+
+void example03()
+{
+	raz::Thread<WorkerWithException> thread;
+
+	thread(false);
+	thread(true);
+
 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
 
@@ -62,6 +96,7 @@ int main()
 {
 	example01();
 	example02();
+	example03();
 
 	return 0;
 }
