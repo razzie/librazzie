@@ -115,11 +115,11 @@ namespace raz
 		template<class... Args>
 		void run(Args... args)
 		{
-			char object_data[sizeof(T)];
+			alignas(alignof(T)) char object_storage[sizeof(T)];
 
 			try
 			{
-				T* object = new (object_data) T(std::forward<Args>(args)...);
+				T* object = new (object_storage) T(std::forward<Args>(args)...);
 
 				std::future<void> exit_token = m_exit_token.get_future();
 				std::list<ForwardedCall> call_queue;
@@ -138,13 +138,20 @@ namespace raz
 					loop<HasParenthesisOp<>::value>(*object);
 
 					auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
-					if (exit_status == std::future_status::ready) return;
+					if (exit_status == std::future_status::ready)
+					{
+						object->~T();
+						return;
+					}
 				}
 			}
 			catch (std::exception& e)
 			{
+				T* object = reinterpret_cast<T*>(object_storage);
+
 				// please note that this is unsafe if the exception was thrown during construction of T
-				error<HasParenthesisOp<std::exception&>::value>(*reinterpret_cast<T*>(object_data), e);
+				error<HasParenthesisOp<std::exception&>::value>(*object, e);
+				object->~T();
 			}
 		}
 	};
