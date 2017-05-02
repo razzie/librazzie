@@ -43,7 +43,7 @@ public:
 
 	void operator()(int value)
 	{
-		std::cout << (base_value + value) << std::endl;
+		std::cout << (base_value * value) << std::endl;
 	}
 };
 
@@ -65,27 +65,33 @@ public:
 void example01()
 {
 	raz::Thread<Loopable> thread;
+
+	thread.start();
+
 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
 
 void example02()
 {
-	raz::Thread<Worker> thread(123);
+	raz::Thread<Worker> thread;
 
-	thread(1);
-	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	for (int i = 0; i < 3; ++i)
+	{
+		thread.start(111);
+		thread(1);
+		thread(2);
+		thread(3);
 
-	thread(2);
-	std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-	thread(3);
-	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		thread.stop();
+	}
 }
 
 void example03()
 {
 	raz::Thread<WorkerWithException> thread;
 
+	thread.start();
 	thread(false);
 	thread(true);
 

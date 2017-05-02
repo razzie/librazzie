@@ -25,8 +25,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <functional>
 #include <future>
 #include <mutex>
-#include <list>
 #include <thread>
+#include <vector>
+#include "raz/memory.hpp"
 
 namespace raz
 {
@@ -34,10 +35,11 @@ namespace raz
 	class Thread
 	{
 	public:
-		template<class... Args>
-		Thread(Args... args)
+		// please note that IMemoryPool must be thread-safe
+		Thread(IMemoryPool* memory = nullptr) :
+			m_memory(memory),
+			m_call_queue(memory)
 		{
-			m_thread = std::thread(&Thread<T>::run<Args...>, this, std::forward<Args>(args)...);
 		}
 
 		Thread(const Thread&) = delete;
@@ -46,24 +48,62 @@ namespace raz
 
 		~Thread()
 		{
-			m_exit_token.set_value();
-			m_thread.join();
+			if (m_thread.joinable())
+			{
+				m_exit_token.set_value();
+				m_thread.join();
+			}
+		}
+
+		template<class... Args>
+		bool start(Args... args)
+		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
+			if (m_thread.joinable())
+				return false;
+
+			m_exit_token = std::move(std::promise<void>());
+			m_thread = std::thread(&Thread<T>::run<Args...>, this, std::forward<Args>(args)...);
+			return true;
+		}
+
+		bool stop()
+		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
+			if (m_thread.joinable())
+			{
+				m_exit_token.set_value();
+				m_thread.join();
+				return true;
+			}
+
+			return false;
+		}
+
+		void clear()
+		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+			m_call_queue.clear();
 		}
 
 		template<class... Args>
 		void operator()(Args... args)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
-			m_call_queue.emplace_back([args...](T& object) { object(args...); });
+			m_call_queue.emplace_back(std::allocator_arg, raz::Allocator<char>(m_memory), [args...](T& object) { object(args...); });
 		}
 
 	private:
 		typedef std::function<void(T&)> ForwardedCall;
+		typedef std::vector<ForwardedCall, raz::Allocator<ForwardedCall>> ForwardedCallQueue;
 
+		IMemoryPool* m_memory;
 		std::thread m_thread;
 		std::promise<void> m_exit_token;
 		std::mutex m_mutex;
-		std::list<ForwardedCall> m_call_queue;
+		ForwardedCallQueue m_call_queue;
 
 		template<class... Args>
 		class HasParenthesisOp
@@ -122,7 +162,7 @@ namespace raz
 				T* object = new (object_storage) T(std::forward<Args>(args)...);
 
 				std::future<void> exit_token = m_exit_token.get_future();
-				std::list<ForwardedCall> call_queue;
+				ForwardedCallQueue call_queue(m_memory);
 
 				for (;;)
 				{
