@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <tuple>
 #include <utility>
 #include "raz/callback.hpp"
+#include "raz/hash.hpp"
 #include "raz/memory.hpp"
 #include "raz/serialization.hpp"
 
@@ -151,14 +152,9 @@ namespace raz
 
 	namespace literal
 	{
-		inline constexpr uint64_t stringhash(const char* str, const uint64_t h = 5381)
-		{
-			return (str[0] == 0) ? h : stringhash(&str[1], h * 33 + str[0]);
-		}
-
 		inline constexpr EventType operator"" _event(const char* evt, size_t)
 		{
-			return (EventType)stringhash(evt);
+			return (EventType)hash(evt);
 		}
 	}
 
