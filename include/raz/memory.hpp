@@ -35,6 +35,23 @@ namespace raz
 		virtual void  deallocate(void* ptr, size_t bytes) = 0;
 		virtual size_t getFreeMemory() const = 0;
 		virtual size_t getUsedMemory() const = 0;
+
+		template<class T, class... Args>
+		T* create(Args... args)
+		{
+			raz::Allocator<T> alloc(this);
+			T* t = std::allocator_traits<raz::Allocator<T>>::allocate(alloc, 1);
+			std::allocator_traits<raz::Allocator<T>>::construct(alloc, t, std::forward<Args>(args)...);
+			return t;
+		}
+
+		template<class T>
+		void destroy(T* t)
+		{
+			raz::Allocator<T> alloc(this);
+			std::allocator_traits<raz::Allocator<T>>::destroy(alloc, t);
+			std::allocator_traits<raz::Allocator<T>>::deallocate(alloc, t, 1);
+		}
 	};
 
 	template<size_t SIZE, size_t ALIGNMENT = 128, class Mutex = std::mutex>
