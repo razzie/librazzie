@@ -20,15 +20,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 */
 
 #pragma once
+#pragma warning(disable: 4307)
 
 #include <cstdint>
 
 namespace raz
 {
-
-#pragma warning(push)
-#pragma warning(disable: 4307)
-
 	/*
 	Modified, recursive version of DJB2 hash function
 	https://en.wikipedia.org/wiki/DJB2
@@ -38,7 +35,4 @@ namespace raz
 	{
 		return (str[0] == 0) ? h : hash(&str[1], h * 33 + str[0]);
 	}
-
-#pragma warning(pop)
-
 }
