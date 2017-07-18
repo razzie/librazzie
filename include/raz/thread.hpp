@@ -31,6 +31,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 namespace raz
 {
+	struct ThreadStop
+	{
+	};
+
 	template<class T>
 	class Thread
 	{
@@ -56,19 +60,7 @@ namespace raz
 		}
 
 		template<class... Args>
-		bool start(Args... args)
-		{
-			std::lock_guard<std::mutex> guard(m_mutex);
-
-			if (m_thread.joinable())
-				return false;
-
-			m_exit_token = std::move(std::promise<void>());
-			m_thread = std::thread(&Thread<T>::run<Args...>, this, std::forward<Args>(args)...);
-			return true;
-		}
-
-		bool stop()
+		std::future<void> start(Args... args)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -76,10 +68,23 @@ namespace raz
 			{
 				m_exit_token.set_value();
 				m_thread.join();
-				return true;
 			}
 
-			return false;
+			m_exit_token = std::move(std::promise<void>());
+			m_thread = std::thread(&Thread<T>::run<Args...>, this, std::forward<Args>(args)...);
+			m_thread_end = std::move(std::promise<void>());
+			return m_thread_end.get_future();
+		}
+
+		void stop()
+		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
+			if (m_thread.joinable())
+			{
+				m_exit_token.set_value();
+				m_thread.join();
+			}
 		}
 
 		void clear()
@@ -102,11 +107,12 @@ namespace raz
 		IMemoryPool* m_memory;
 		std::thread m_thread;
 		std::promise<void> m_exit_token;
+		std::promise<void> m_thread_end;
 		std::mutex m_mutex;
 		ForwardedCallQueue m_call_queue;
 
 		template<class... Args>
-		class HasParenthesisOp
+		class OpCaller
 		{
 			template<class U>
 			static auto test(bool) -> decltype(std::declval<U>()(std::declval<Args>()...), void(), std::true_type{})
@@ -120,46 +126,32 @@ namespace raz
 				return {};
 			}
 
+			static constexpr bool has_parenthesis_op = decltype(test<T>(true))::value;
+
+			template<bool value>
+			static std::enable_if_t<value> _call(T& object, Args... args)
+			{
+				object(std::forward<Args>(args)...);
+			}
+
+			template<int value>
+			static std::enable_if_t<!value> _call(T& object, Args... args)
+			{
+			}
+
 		public:
-			static constexpr bool value = decltype(test<T>(true))::value;
+			static void call(T& object, Args... args)
+			{
+				_call<has_parenthesis_op>(object, std::forward<Args>(args)...);
+			}
 		};
-
-		template<bool>
-		void loop(T&);
-
-		template<>
-		void loop<true>(T& object)
-		{
-			object();
-		}
-
-		template<>
-		void loop<false>(T& object)
-		{
-		}
-
-		template<bool>
-		void error(T&, std::exception&);
-
-		template<>
-		void error<true>(T& object, std::exception& e)
-		{
-			object(e);
-		}
-
-		template<>
-		void error<false>(T& object, std::exception& e)
-		{
-		}
 
 		template<class... Args>
 		void run(Args... args)
 		{
-			alignas(alignof(T)) char object_storage[sizeof(T)];
-
 			try
 			{
-				T* object = new (object_storage) T(std::forward<Args>(args)...);
+				T object(std::forward<Args>(args)...);
 
 				std::future<void> exit_token = m_exit_token.get_future();
 				ForwardedCallQueue call_queue(m_memory);
@@ -171,27 +163,57 @@ namespace raz
 					m_mutex.unlock();
 
 					for (auto& call : call_queue)
-						call(*object);
+					{
+						try
+						{
+							call(object);
+						}
+						catch (ThreadStop)
+						{
+							m_thread_end.set_value();
+							return;
+						}
+						catch (std::exception& e)
+						{
+							OpCaller<std::exception&>::call(object, e);
+						}
+						catch (...)
+						{
+							OpCaller<std::exception_ptr>::call(object, std::current_exception());
+						}
+					}
 
 					call_queue.clear();
 
-					loop<HasParenthesisOp<>::value>(*object);
+					try
+					{
+						OpCaller<>::call(object);
+					}
+					catch (ThreadStop)
+					{
+						m_thread_end.set_value();
+						return;
+					}
+					catch (std::exception& e)
+					{
+						OpCaller<std::exception&>::call(object, e);
+					}
+					catch (...)
+					{
+						OpCaller<std::exception_ptr>::call(object, std::current_exception());
+					}
 
 					auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
 					if (exit_status == std::future_status::ready)
 					{
-						object->~T();
+						m_thread_end.set_value();
 						return;
 					}
 				}
 			}
-			catch (std::exception& e)
+			catch (...)
 			{
-				T* object = reinterpret_cast<T*>(object_storage);
-
-				// please note that this is unsafe if the exception was thrown during construction of T
-				error<HasParenthesisOp<std::exception&>::value>(*object, e);
-				object->~T();
+				m_thread_end.set_exception(std::current_exception());
 			}
 		}
 	};
