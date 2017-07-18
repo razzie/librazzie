@@ -42,6 +42,8 @@ namespace raz
 		// please note that IMemoryPool must be thread-safe
 		Thread(IMemoryPool* memory = nullptr) :
 			m_memory(memory),
+			m_exit_token(std::allocator_arg, raz::Allocator<int>(memory)),
+			m_thread_result(std::allocator_arg, raz::Allocator<int>(memory)),
 			m_call_queue(memory)
 		{
 		}
@@ -70,10 +72,10 @@ namespace raz
 				m_thread.join();
 			}
 
-			m_exit_token = std::move(std::promise<void>());
+			m_exit_token = std::move(std::promise<void>(std::allocator_arg, raz::Allocator<int>(m_memory)));
+			m_thread_result = std::move(std::promise<void>(std::allocator_arg, raz::Allocator<int>(m_memory)));
 			m_thread = std::thread(&Thread<T>::run<Args...>, this, std::forward<Args>(args)...);
-			m_thread_end = std::move(std::promise<void>());
-			return m_thread_end.get_future();
+			return m_thread_result.get_future();
 		}
 
 		void stop()
@@ -107,7 +109,7 @@ namespace raz
 		IMemoryPool* m_memory;
 		std::thread m_thread;
 		std::promise<void> m_exit_token;
-		std::promise<void> m_thread_end;
+		std::promise<void> m_thread_result;
 		std::mutex m_mutex;
 		ForwardedCallQueue m_call_queue;
 
@@ -170,7 +172,7 @@ namespace raz
 						}
 						catch (ThreadStop)
 						{
-							m_thread_end.set_value();
+							m_thread_result.set_value();
 							return;
 						}
 						catch (std::exception& e)
@@ -191,7 +193,7 @@ namespace raz
 					}
 					catch (ThreadStop)
 					{
-						m_thread_end.set_value();
+						m_thread_result.set_value();
 						return;
 					}
 					catch (std::exception& e)
@@ -206,14 +208,14 @@ namespace raz
 					auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
 					if (exit_status == std::future_status::ready)
 					{
-						m_thread_end.set_value();
+						m_thread_result.set_value();
 						return;
 					}
 				}
 			}
 			catch (...)
 			{
-				m_thread_end.set_exception(std::current_exception());
+				m_thread_result.set_exception(std::current_exception());
 			}
 		}
 	};
