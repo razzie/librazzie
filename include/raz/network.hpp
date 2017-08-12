@@ -132,8 +132,8 @@ namespace raz
 		size_t m_data_pos;
 	};
 
-	template<size_t SIZE = 2048>
-	using Packet = typename Serializer<PacketBuffer<SIZE>>;
+	template<size_t SIZE = 2048, bool EndiannessConversion = false>
+	using Packet = typename Serializer<PacketBuffer<SIZE>, EndiannessConversion>;
 
 	class PacketCapacityException : public std::exception
 	{
