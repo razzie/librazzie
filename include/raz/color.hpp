@@ -60,9 +60,9 @@ namespace raz
 			for (size_t iter = n / 6; iter > 0; iter /= 6)
 			{
 				Color sub = m_table[iter % 6];
-				sub.r /= iter + 1;
-				sub.g /= iter + 1;
-				sub.b /= iter + 1;
+				sub.r /= (uint8_t)iter + 1;
+				sub.g /= (uint8_t)iter + 1;
+				sub.b /= (uint8_t)iter + 1;
 
 				base.r -= sub.r;
 				base.g -= sub.g;
