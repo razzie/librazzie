@@ -239,6 +239,7 @@ namespace raz
 		{
 			UNSET,
 			CLIENT_CONNECTED,
+			CLIENT_DISCONNECTED,
 			PACKET_RECEIVED
 		};
 
@@ -372,6 +373,10 @@ namespace raz
 
 						u_long bytes_available = 0;
 						ioctlsocket(sock, FIONREAD, &bytes_available);
+
+						if (bytes_available == 0)
+							state = ClientState::CLIENT_DISCONNECTED;
+
 						return static_cast<size_t>(bytes_available);
 					}
 				}
