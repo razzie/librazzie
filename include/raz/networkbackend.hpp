@@ -375,7 +375,10 @@ namespace raz
 						ioctlsocket(sock, FIONREAD, &bytes_available);
 
 						if (bytes_available == 0)
+						{
+							close(client);
 							state = ClientState::CLIENT_DISCONNECTED;
+						}
 
 						return static_cast<size_t>(bytes_available);
 					}
