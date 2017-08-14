@@ -124,15 +124,17 @@ namespace raz
 				(*this)(t);
 		}
 
-		template<class Allocator>
-		Serializer& operator()(std::basic_string<char, std::char_traits<char>, Allocator>& str)
+		template<class CharType, class Allocator>
+		Serializer& operator()(std::basic_string<CharType, std::char_traits<CharType>, Allocator>& str)
 		{
 			if (BufferType::getMode() == SerializationMode::SERIALIZE)
 			{
 				uint32_t len = static_cast<uint32_t>(str.length());
 				(*this)(len);
 
-				if (BufferType::write(str.c_str(), len) < len)
+				len *= sizeof(CharType);
+
+				if (BufferType::write(reinterpret_cast<const char*>(str.c_str()), len) < len)
 					throw SerializationError();
 			}
 			else
@@ -142,7 +144,9 @@ namespace raz
 
 				str.resize(len);
 
-				if (BufferType::read(&str[0], len) < len)
+				len *= sizeof(CharType);
+
+				if (BufferType::read(reinterpret_cast<char*>(&str[0]), len) < len)
 					throw SerializationError();
 			}
 
