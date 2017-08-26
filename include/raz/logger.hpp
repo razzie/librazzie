@@ -41,9 +41,16 @@ namespace raz
 			File
 		};
 
-		Logger() :
-			m_start_time(std::chrono::system_clock::now())
+		Logger(Output default_output = Output::StdOut) :
+			m_start_time(std::chrono::system_clock::now()),
+			m_default_output(default_output)
 		{
+		}
+
+		template<class... Args>
+		void operator()(const Args&... args)
+		{
+			operator()(m_default_output, args...);
 		}
 
 		template<class... Args>
@@ -61,6 +68,7 @@ namespace raz
 	private:
 		std::mutex m_mutex;
 		std::chrono::time_point<std::chrono::system_clock> m_start_time;
+		Output m_default_output;
 		std::ofstream m_logfile;
 
 		std::ostream* getOutput(Output output)
