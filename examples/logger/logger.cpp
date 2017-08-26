@@ -24,6 +24,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 int main()
 {
 	raz::Logger log;
+
+	log("1 + 1 = ", 1 + 1);
 	log(raz::Logger::StdOut, "2 + 2 = ", 2 + 2);
 
 	return 0;
