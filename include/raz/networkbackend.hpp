@@ -649,7 +649,8 @@ namespace raz
 		enum ClientState
 		{
 			UNSET,
-			PACKET_RECEIVED
+			PACKET_RECEIVED,
+			CLIENT_UNAVAILABLE
 		};
 
 		NetworkServerBackendUDP() :
@@ -752,7 +753,14 @@ namespace raz
 			else if (rc > 0)
 			{
 				int addrlen = sizeof(client.sockaddr);
-				m_data_len = recvfrom(m_socket, m_data, BUF_SIZE, 0, reinterpret_cast<struct sockaddr*>(&client.sockaddr), &addrlen);
+				int rc = recvfrom(m_socket, m_data, BUF_SIZE, 0, reinterpret_cast<struct sockaddr*>(&client.sockaddr), &addrlen);
+				if (rc == SOCKET_ERROR)
+				{
+					state = ClientState::CLIENT_UNAVAILABLE;
+					return 0;
+				}
+
+				m_data_len = static_cast<size_t>(rc);
 				m_data_pos = 0;
 				m_last_client = client;
 
