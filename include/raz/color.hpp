@@ -46,9 +46,9 @@ namespace raz
 				Color(255, 0, 0),
 				Color(0, 255, 0),
 				Color(0, 0, 255),
-				Color(255, 255, 0),
+				Color(0, 255, 255),
 				Color(255, 0, 255),
-				Color(0, 255, 255)
+				Color(255, 255, 0)
 			}
 		{
 		}
@@ -57,16 +57,20 @@ namespace raz
 		{
 			Color base = m_table[n % 6];
 
-			for (size_t iter = n / 6; iter > 0; iter /= 6)
+			for (size_t iter = 0, max_iter = n / 6; iter < max_iter; ++iter)
 			{
-				Color sub = m_table[iter % 6];
-				sub.r /= (uint8_t)iter + 1;
-				sub.g /= (uint8_t)iter + 1;
-				sub.b /= (uint8_t)iter + 1;
+				Color sub = m_table[5 - iter % 6];
+				sub.r /= 2 << (iter + 1);
+				sub.g /= 2 << (iter + 1);
+				sub.b /= 2 << (iter + 1);
 
-				base.r -= sub.r;
-				base.g -= sub.g;
-				base.b -= sub.b;
+				base.r /= 2;
+				base.g /= 2;
+				base.b /= 2;
+
+				base.r += sub.r;
+				base.g += sub.g;
+				base.b += sub.b;
 			}
 
 			return base;
