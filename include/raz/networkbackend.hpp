@@ -570,7 +570,7 @@ namespace raz
 			}
 			else if (rc > 0)
 			{
-				m_data_len = recv(m_socket, m_data, BUF_SIZE, MSG_PEEK);
+				m_data_len = recv(m_socket, m_data, BUF_SIZE, 0);
 				m_data_pos = 0;
 				return m_data_len;
 			}
