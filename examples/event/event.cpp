@@ -22,20 +22,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <iostream>
 #include "raz/event.hpp"
 
-using namespace raz::literal; // for the _event literal operator
+using namespace raz::literal; // for the _event and _recv literal operators
 
-struct FooData
+struct FooEvent : public raz::Event<"foo"_event>
 {
 	int i;
 };
-
-typedef raz::Event<"foo"_event, FooData> FooEvent;
 
 struct FooReceiver : public raz::EventReceiver<"foo"_recv>
 {
 	void operator()(const FooEvent& e)
 	{
-		std::cout << e.data.i << std::endl;
+		std::cout << e.i << std::endl;
 	}
 };
 
@@ -47,7 +45,7 @@ int main()
 	dispatcher.addEventRoute<FooEvent>(&receiver);
 
 	FooEvent e;
-	e.data.i = 12345;
+	e.i = 12345;
 	dispatcher.dispatch(e);
 
 	return 0;
