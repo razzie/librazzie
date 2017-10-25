@@ -20,65 +20,35 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 */
 
 #include <iostream>
-#include <string>
 #include "raz/event.hpp"
-#include "raz/eventutil.hpp"
 
 using namespace raz::literal; // for the _event literal operator
 
-typedef raz::Event<"foo"_event, std::string, int> FooEvent;
-typedef raz::Event<"bar"_event, float> BarEvent;
-
-struct FooEventCallback : public raz::Callback<FooEvent>
+struct FooData
 {
-	FooEventCallback(raz::EventCallbackSystem<FooEvent>& system) :
-		Callback(system)
-	{
-	}
+	int i;
+};
 
-	virtual void handle(const FooEvent& e) // inherited from FooEvent::Callback
+typedef raz::Event<"foo"_event, FooData> FooEvent;
+
+struct FooReceiver : public raz::EventReceiver<"foo"_recv>
+{
+	void operator()(const FooEvent& e)
 	{
-		std::cout << e.get<0>() << " - " << e.get<1>() << std::endl;
+		std::cout << e.data.i << std::endl;
 	}
 };
 
-void example01()
-{
-	raz::EventCallbackSystem<FooEvent> foo_callbacks;
-
-	FooEventCallback r(foo_callbacks);
-
-	foo_callbacks.handle(FooEvent("razzie", 99));
-}
-
-void example02()
-{
-	raz::EventCallbackSystem<FooEvent> foo_callbacks;
-	raz::EventCallbackSystem<BarEvent> bar_callbacks;
-	raz::EventDispatcher<FooEvent, BarEvent> event_handler(foo_callbacks, bar_callbacks);
-
-	FooEventCallback r(foo_callbacks);
-
-	FooEvent e("razzie", 99);
-	event_handler.handle(e);
-}
-
-void example03()
-{
-	raz::EventSystem<FooEvent, BarEvent> event_handler;
-	raz::EventQueueSystem<FooEvent, BarEvent> event_queue;
-
-	FooEventCallback r(event_handler.getCallbackSystem<FooEvent>());
-
-	event_queue.enqueue<"foo"_event>("razzie", 99);
-	event_queue.dequeue(event_handler);
-}
-
 int main()
 {
-	example01();
-	example02();
-	example03();
+	raz::EventDispatcher dispatcher;
+
+	FooReceiver receiver;
+	dispatcher.addEventRoute<FooEvent>(&receiver);
+
+	FooEvent e;
+	e.data.i = 12345;
+	dispatcher.dispatch(e);
 
 	return 0;
 }
