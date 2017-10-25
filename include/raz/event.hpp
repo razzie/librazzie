@@ -35,19 +35,12 @@ namespace raz
 	typedef uint32_t EventReceiverID;
 	typedef uint32_t EventRouteID;
 
-	template<EventType ET, class Data>
+	template<EventType Type>
 	struct Event
 	{
-		static constexpr EventType event_type = ET;
+		static constexpr EventType event_type = Type;
 		EventReceiverID source = 0;
 		EventReceiverID target = 0;
-		Data data;
-
-		template<class Serializer>
-		void operator()(Serializer& serializer)
-		{
-			serializer(data);
-		}
 	};
 
 	namespace e
@@ -75,7 +68,6 @@ namespace raz
 			template<class EventReceiver>
 			EventRoute(EventReceiver* receiver, EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0) :
 				m_receiver(receiver),
-				//m_handler([](IEventReceiver* receiver, const Event& e) { static_cast<EventReceiver*>(receiver)->operator()(e); }),
 				m_handler(&__handler<EventReceiver>),
 				m_condition(condition),
 				m_id(id)
