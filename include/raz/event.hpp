@@ -256,7 +256,9 @@ namespace raz
 			auto it = m_route_tables.find(typeid(Event));
 			if (it == m_route_tables.end())
 			{
-				decltype(m_route_tables)::mapped_type ptr(m_memory ? m_memory->create<EventRouteTable<Event>>() : new EventRouteTable<Event>(), m_memory);
+				decltype(m_route_tables)::mapped_type ptr(
+					m_memory ? m_memory->create<EventRouteTable<Event>>(m_memory) : new EventRouteTable<Event>(),
+					m_memory);
 				it = m_route_tables.emplace(typeid(Event), std::move(ptr)).first;
 			}
 
