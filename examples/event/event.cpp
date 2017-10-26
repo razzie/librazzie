@@ -22,9 +22,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <iostream>
 #include "raz/event.hpp"
 
-using namespace raz::literal; // for the _event literal operator
-
-struct FooEvent : public raz::Event<"foo"_event>
+struct FooEvent
 {
 	int i;
 };
@@ -44,8 +42,7 @@ int main()
 	FooReceiver receiver;
 	dispatcher.addEventRoute<FooEvent>(&receiver);
 
-	FooEvent e;
-	e.i = 12345;
+	FooEvent e{ 12345 };
 	dispatcher.dispatch(e);
 
 	return 0;

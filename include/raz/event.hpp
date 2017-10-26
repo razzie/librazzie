@@ -25,34 +25,27 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <map>
 #include <memory>
 #include <mutex>
+#include <typeindex>
 #include <vector>
-#include "raz/hash.hpp"
 #include "raz/memory.hpp"
 
 namespace raz
 {
-	typedef uint32_t EventType;
 	typedef uint32_t EventRouteID;
 	typedef void EventReceiver;
 	typedef void Cookie;
 
-	template<EventType Type>
-	struct Event
-	{
-		static constexpr EventType event_type = Type;
-	};
+	template<class EventT>
+	using EventRouteCondition = bool(*)(const EventT&, Cookie*);
 
 	namespace e
 	{
-		template<class Event>
-		using EventRouteCondition = bool(*)(const Event&, Cookie*);
-
-		template<class Event>
+		template<class EventT>
 		class EventRoute
 		{
 		public:
 			template<class EventReceiverT>
-			EventRoute(EventReceiverT* receiver, EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0) :
+			EventRoute(EventReceiverT* receiver, EventRouteCondition<EventT> condition = nullptr, EventRouteID id = 0) :
 				m_receiver(receiver),
 				m_handler(&__handler<EventReceiverT>),
 				m_condition(condition),
@@ -70,7 +63,7 @@ namespace raz
 				return m_receiver;
 			}
 
-			void operator()(const Event& e, Cookie* cookie) const
+			void operator()(const EventT& e, Cookie* cookie) const
 			{
 				if (!m_condition || (m_condition && m_condition(e, cookie)))
 				{
@@ -79,17 +72,17 @@ namespace raz
 			}
 
 		private:
-			typedef void(*EventHandler)(EventReceiver*, const Event&);
+			typedef void(*EventHandler)(EventReceiver*, const EventT&);
 
 			template<class EventReceiverT>
-			static void __handler(EventReceiver* receiver, const Event& e)
+			static void __handler(EventReceiver* receiver, const EventT& e)
 			{
 				static_cast<EventReceiverT*>(receiver)->operator()(e);
 			}
 
 			EventReceiver* m_receiver;
 			EventHandler m_handler;
-			EventRouteCondition<Event> m_condition;
+			EventRouteCondition<EventT> m_condition;
 			EventRouteID m_id;
 		};
 
@@ -100,7 +93,7 @@ namespace raz
 			virtual void remove(EventReceiver* receiver) = 0;
 		};
 
-		template<class Event>
+		template<class EventT>
 		class EventRouteTable : public IEventRouteTable
 		{
 		public:
@@ -110,7 +103,7 @@ namespace raz
 			}
 
 			template<class EventReceiverT>
-			void add(EventReceiverT* receiver, EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0)
+			void add(EventReceiverT* receiver, EventRouteCondition<EventT> condition = nullptr, EventRouteID id = 0)
 			{
 				m_routes.emplace_back(receiver, condition, id);
 			}
@@ -137,7 +130,7 @@ namespace raz
 				}
 			}
 
-			void handle(const Event& e, Cookie* cookie) const
+			void handle(const EventT& e, Cookie* cookie) const
 			{
 				for (auto& route : m_routes)
 				{
@@ -146,7 +139,7 @@ namespace raz
 			}
 
 		private:
-			std::vector<EventRoute<Event>, raz::Allocator<EventRoute<Event>>> m_routes;
+			std::vector<EventRoute<EventT>, raz::Allocator<EventRoute<EventT>>> m_routes;
 		};
 	}
 
@@ -168,26 +161,26 @@ namespace raz
 			}
 		}
 
-		template<class Event, class EventReceiverT>
-		void addEventRoute(EventReceiverT* receiver, e::EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0)
+		template<class EventT, class EventReceiverT>
+		void addEventRoute(EventReceiverT* receiver, EventRouteCondition<EventT> condition = nullptr, EventRouteID id = 0)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			getRouteTable<Event>()->add(receiver, condition, id);
+			getRouteTable<EventT>()->add(receiver, condition, id);
 		}
 
-		template<class Event>
+		template<class EventT>
 		void removeEventRoute(EventRouteID id)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			getRouteTable<Event>()->remove(id);
+			getRouteTable<EventT>()->remove(id);
 		}
 
-		template<class Event>
-		void dispatch(const Event& e, Cookie* cookie = nullptr) const
+		template<class EventT>
+		void dispatch(const EventT& e, Cookie* cookie = nullptr) const
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 
-			const auto* table = getRouteTable<Event>();
+			const auto* table = getRouteTable<EventT>();
 			if (table)
 			{
 				table->handle(e, cookie);
@@ -217,37 +210,29 @@ namespace raz
 
 		mutable std::recursive_mutex m_mutex;
 		IMemoryPool* m_memory;
-		std::map<EventType, std::unique_ptr<e::IEventRouteTable, CustomRouteDeleter>> m_route_tables;
+		std::map<std::type_index, std::unique_ptr<e::IEventRouteTable, CustomRouteDeleter>> m_route_tables;
 
-		template<class Event>
-		e::EventRouteTable<Event>* getRouteTable()
+		template<class EventT>
+		e::EventRouteTable<EventT>* getRouteTable()
 		{
-			auto it = m_route_tables.find(Event::event_type);
+			auto it = m_route_tables.find(typeid(EventT));
 			if (it == m_route_tables.end())
 			{
-				decltype(m_route_tables)::mapped_type ptr(m_memory ? m_memory->create<e::EventRouteTable<Event>>() : new e::EventRouteTable<Event>(), m_memory);
-				it = m_route_tables.emplace(Event::event_type, std::move(ptr)).first;
+				decltype(m_route_tables)::mapped_type ptr(m_memory ? m_memory->create<e::EventRouteTable<EventT>>() : new e::EventRouteTable<EventT>(), m_memory);
+				it = m_route_tables.emplace(typeid(EventT), std::move(ptr)).first;
 			}
 
-			return static_cast<e::EventRouteTable<Event>*>(it->second.get());
+			return static_cast<e::EventRouteTable<EventT>*>(it->second.get());
 		}
 
-		template<class Event>
-		const e::EventRouteTable<Event>* getRouteTable() const
+		template<class EventT>
+		const e::EventRouteTable<EventT>* getRouteTable() const
 		{
-			auto it = m_route_tables.find(Event::event_type);
+			auto it = m_route_tables.find(typeid(EventT));
 			if (it == m_route_tables.end())
 				return nullptr;
 
-			return static_cast<const e::EventRouteTable<Event>*>(it->second.get());
+			return static_cast<const e::EventRouteTable<EventT>*>(it->second.get());
 		}
 	};
-
-	namespace literal
-	{
-		inline constexpr EventType operator"" _event(const char* evt, size_t)
-		{
-			return (EventType)hash(evt);
-		}
-	}
 }
