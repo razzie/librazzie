@@ -38,7 +38,8 @@ namespace raz
 		using EventRouteCondition = bool(*)(const Event&, Cookie*);
 
 		EventDispatcher(IMemoryPool* memory = nullptr) :
-			m_memory(memory)
+			m_memory(memory),
+			m_recursion(0)
 		{
 		}
 
@@ -46,6 +47,8 @@ namespace raz
 		void addEventRoute(EventReceiver* receiver, EventRouteCondition<Event, Cookie> condition = nullptr, int route_id = 0)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+			RecursionGuard rguard(m_recursion);
+
 			getRouteTable<Event>()->add(receiver, condition, route_id);
 		}
 
@@ -53,6 +56,8 @@ namespace raz
 		void removeEventRoute(int route_id)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+			RecursionGuard rguard(m_recursion);
+
 			getRouteTable<Event>()->remove(route_id);
 		}
 
@@ -60,6 +65,7 @@ namespace raz
 		void dispatch(const Event& e, Cookie* cookie = nullptr) const
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+			RecursionGuard rguard(m_recursion);
 
 			const auto* table = getRouteTable<Event>();
 			if (table)
@@ -71,12 +77,17 @@ namespace raz
 		void unbindReceiver(void* receiver)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+			RecursionGuard rguard(m_recursion);
 
 			for (auto& it : m_route_tables)
 			{
 				it.second->remove(receiver);
 			}
 		}
+
+		struct RecursionDetected : public std::exception
+		{
+		};
 
 		struct CookieTypeMismatch : public std::exception
 		{
@@ -214,7 +225,28 @@ namespace raz
 			IMemoryPool* m_memory;
 		};
 
+		class RecursionGuard
+		{
+		public:
+			RecursionGuard(int& recursion) : m_recursion(recursion)
+			{
+				if (m_recursion > 0)
+					throw RecursionDetected();
+
+				++m_recursion;
+			}
+
+			~RecursionGuard()
+			{
+				--m_recursion;
+			}
+
+		private:
+			int& m_recursion;
+		};
+
 		mutable std::recursive_mutex m_mutex;
+		mutable int m_recursion;
 		IMemoryPool* m_memory;
 		std::map<std::type_index, std::unique_ptr<IEventRouteTable, CustomRouteDeleter>> m_route_tables;
 
