@@ -174,7 +174,7 @@ namespace raz
 
 		void unbindReceiver(e::IEventReceiver* receiver)
 		{
-			std::lock_guard<std::mutex> guard(m_mutex);
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 
 			for (auto& it : m_route_tables)
 			{
@@ -185,21 +185,21 @@ namespace raz
 		template<class Event, class EventReceiver>
 		void addEventRoute(EventReceiver* receiver, e::EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0)
 		{
-			std::lock_guard<std::mutex> guard(m_mutex);
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 			getRouteTable<Event>()->add(receiver, condition, id);
 		}
 
 		template<class Event>
 		void removeEventRoute(EventRouteID id)
 		{
-			std::lock_guard<std::mutex> guard(m_mutex);
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 			getRouteTable<Event>()->remove(id);
 		}
 
 		template<class Event>
 		void dispatch(const Event& e, void* cookie = nullptr) const
 		{
-			std::lock_guard<std::mutex> guard(m_mutex);
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 
 			const auto* table = getRouteTable<Event>();
 			if (table)
@@ -229,7 +229,7 @@ namespace raz
 			IMemoryPool* m_memory;
 		};
 
-		mutable std::mutex m_mutex;
+		mutable std::recursive_mutex m_mutex;
 		IMemoryPool* m_memory;
 		std::map<EventType, std::unique_ptr<e::IEventRouteTable, CustomRouteDeleter>> m_route_tables;
 
