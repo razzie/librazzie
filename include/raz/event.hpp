@@ -38,8 +38,51 @@ namespace raz
 	template<class EventT>
 	using EventRouteCondition = bool(*)(const EventT&, Cookie*);
 
-	namespace e
+	class EventDispatcher
 	{
+	public:
+		EventDispatcher(IMemoryPool* memory = nullptr) :
+			m_memory(memory)
+		{
+		}
+
+		void unbindReceiver(EventReceiver* receiver)
+		{
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+
+			for (auto& it : m_route_tables)
+			{
+				it.second->remove(receiver);
+			}
+		}
+
+		template<class EventT, class EventReceiverT>
+		void addEventRoute(EventReceiverT* receiver, EventRouteCondition<EventT> condition = nullptr, EventRouteID id = 0)
+		{
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+			getRouteTable<EventT>()->add(receiver, condition, id);
+		}
+
+		template<class EventT>
+		void removeEventRoute(EventRouteID id)
+		{
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+			getRouteTable<EventT>()->remove(id);
+		}
+
+		template<class EventT>
+		void dispatch(const EventT& e, Cookie* cookie = nullptr) const
+		{
+			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
+
+			const auto* table = getRouteTable<EventT>();
+			if (table)
+			{
+				table->handle(e, cookie);
+			}
+		}
+
+	private:
 		template<class EventT>
 		class EventRoute
 		{
@@ -141,53 +184,7 @@ namespace raz
 		private:
 			std::vector<EventRoute<EventT>, raz::Allocator<EventRoute<EventT>>> m_routes;
 		};
-	}
 
-	class EventDispatcher
-	{
-	public:
-		EventDispatcher(IMemoryPool* memory = nullptr) :
-			m_memory(memory)
-		{
-		}
-
-		void unbindReceiver(EventReceiver* receiver)
-		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-
-			for (auto& it : m_route_tables)
-			{
-				it.second->remove(receiver);
-			}
-		}
-
-		template<class EventT, class EventReceiverT>
-		void addEventRoute(EventReceiverT* receiver, EventRouteCondition<EventT> condition = nullptr, EventRouteID id = 0)
-		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			getRouteTable<EventT>()->add(receiver, condition, id);
-		}
-
-		template<class EventT>
-		void removeEventRoute(EventRouteID id)
-		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			getRouteTable<EventT>()->remove(id);
-		}
-
-		template<class EventT>
-		void dispatch(const EventT& e, Cookie* cookie = nullptr) const
-		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-
-			const auto* table = getRouteTable<EventT>();
-			if (table)
-			{
-				table->handle(e, cookie);
-			}
-		}
-
-	private:
 		class CustomRouteDeleter
 		{
 		public:
@@ -196,7 +193,7 @@ namespace raz
 			{
 			}
 
-			void operator()(e::IEventRouteTable* ptr)
+			void operator()(IEventRouteTable* ptr)
 			{
 				if (m_memory)
 					m_memory->destroy(ptr);
@@ -210,29 +207,29 @@ namespace raz
 
 		mutable std::recursive_mutex m_mutex;
 		IMemoryPool* m_memory;
-		std::map<std::type_index, std::unique_ptr<e::IEventRouteTable, CustomRouteDeleter>> m_route_tables;
+		std::map<std::type_index, std::unique_ptr<IEventRouteTable, CustomRouteDeleter>> m_route_tables;
 
 		template<class EventT>
-		e::EventRouteTable<EventT>* getRouteTable()
+		EventRouteTable<EventT>* getRouteTable()
 		{
 			auto it = m_route_tables.find(typeid(EventT));
 			if (it == m_route_tables.end())
 			{
-				decltype(m_route_tables)::mapped_type ptr(m_memory ? m_memory->create<e::EventRouteTable<EventT>>() : new e::EventRouteTable<EventT>(), m_memory);
+				decltype(m_route_tables)::mapped_type ptr(m_memory ? m_memory->create<EventRouteTable<EventT>>() : new EventRouteTable<EventT>(), m_memory);
 				it = m_route_tables.emplace(typeid(EventT), std::move(ptr)).first;
 			}
 
-			return static_cast<e::EventRouteTable<EventT>*>(it->second.get());
+			return static_cast<EventRouteTable<EventT>*>(it->second.get());
 		}
 
 		template<class EventT>
-		const e::EventRouteTable<EventT>* getRouteTable() const
+		const EventRouteTable<EventT>* getRouteTable() const
 		{
 			auto it = m_route_tables.find(typeid(EventT));
 			if (it == m_route_tables.end())
 				return nullptr;
 
-			return static_cast<const e::EventRouteTable<EventT>*>(it->second.get());
+			return static_cast<const EventRouteTable<EventT>*>(it->second.get());
 		}
 	};
 }
