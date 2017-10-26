@@ -32,43 +32,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 namespace raz
 {
 	typedef uint32_t EventType;
-	typedef uint32_t EventReceiverID;
 	typedef uint32_t EventRouteID;
+	typedef void EventReceiver;
+	typedef void Cookie;
 
 	template<EventType Type>
 	struct Event
 	{
 		static constexpr EventType event_type = Type;
-		EventReceiverID source = 0;
-		EventReceiverID target = 0;
-	};
-
-	namespace e
-	{
-		struct IEventReceiver
-		{
-		};
-	}
-
-	template<EventReceiverID ReceiverID = __COUNTER__>
-	struct EventReceiver : public e::IEventReceiver
-	{
-		static constexpr EventReceiverID receiver_id = ReceiverID; // must be unique
 	};
 
 	namespace e
 	{
 		template<class Event>
-		using EventRouteCondition = bool(*)(const Event&, void*);
+		using EventRouteCondition = bool(*)(const Event&, Cookie*);
 
 		template<class Event>
 		class EventRoute
 		{
 		public:
-			template<class EventReceiver>
-			EventRoute(EventReceiver* receiver, EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0) :
+			template<class EventReceiverT>
+			EventRoute(EventReceiverT* receiver, EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0) :
 				m_receiver(receiver),
-				m_handler(&__handler<EventReceiver>),
+				m_handler(&__handler<EventReceiverT>),
 				m_condition(condition),
 				m_id(id)
 			{
@@ -79,12 +65,12 @@ namespace raz
 				return m_id;
 			}
 
-			IEventReceiver* getEventReceiver()
+			EventReceiver* getEventReceiver()
 			{
 				return m_receiver;
 			}
 
-			void operator()(const Event& e, void* cookie) const
+			void operator()(const Event& e, Cookie* cookie) const
 			{
 				if (!m_condition || (m_condition && m_condition(e, cookie)))
 				{
@@ -93,15 +79,15 @@ namespace raz
 			}
 
 		private:
-			typedef void(*EventHandler)(IEventReceiver*, const Event&);
+			typedef void(*EventHandler)(EventReceiver*, const Event&);
 
-			template<class EventReceiver>
-			static void __handler(IEventReceiver* receiver, const Event& e)
+			template<class EventReceiverT>
+			static void __handler(EventReceiver* receiver, const Event& e)
 			{
-				static_cast<EventReceiver*>(receiver)->operator()(e);
+				static_cast<EventReceiverT*>(receiver)->operator()(e);
 			}
 
-			IEventReceiver* m_receiver;
+			EventReceiver* m_receiver;
 			EventHandler m_handler;
 			EventRouteCondition<Event> m_condition;
 			EventRouteID m_id;
@@ -111,7 +97,7 @@ namespace raz
 		{
 		public:
 			virtual ~IEventRouteTable() = default;
-			virtual void remove(IEventReceiver* receiver) = 0;
+			virtual void remove(EventReceiver* receiver) = 0;
 		};
 
 		template<class Event>
@@ -123,8 +109,8 @@ namespace raz
 			{
 			}
 
-			template<class EventReceiver>
-			void add(EventReceiver* receiver, EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0)
+			template<class EventReceiverT>
+			void add(EventReceiverT* receiver, EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0)
 			{
 				m_routes.emplace_back(receiver, condition, id);
 			}
@@ -140,7 +126,7 @@ namespace raz
 				}
 			}
 
-			virtual void remove(IEventReceiver* receiver)
+			virtual void remove(EventReceiver* receiver)
 			{
 				for (auto it = m_routes.begin(); it != m_routes.end(); )
 				{
@@ -151,7 +137,7 @@ namespace raz
 				}
 			}
 
-			void handle(const Event& e, void* cookie) const
+			void handle(const Event& e, Cookie* cookie) const
 			{
 				for (auto& route : m_routes)
 				{
@@ -172,7 +158,7 @@ namespace raz
 		{
 		}
 
-		void unbindReceiver(e::IEventReceiver* receiver)
+		void unbindReceiver(EventReceiver* receiver)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 
@@ -182,8 +168,8 @@ namespace raz
 			}
 		}
 
-		template<class Event, class EventReceiver>
-		void addEventRoute(EventReceiver* receiver, e::EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0)
+		template<class Event, class EventReceiverT>
+		void addEventRoute(EventReceiverT* receiver, e::EventRouteCondition<Event> condition = nullptr, EventRouteID id = 0)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 			getRouteTable<Event>()->add(receiver, condition, id);
@@ -197,7 +183,7 @@ namespace raz
 		}
 
 		template<class Event>
-		void dispatch(const Event& e, void* cookie = nullptr) const
+		void dispatch(const Event& e, Cookie* cookie = nullptr) const
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 
@@ -260,11 +246,6 @@ namespace raz
 	namespace literal
 	{
 		inline constexpr EventType operator"" _event(const char* evt, size_t)
-		{
-			return (EventType)hash(evt);
-		}
-
-		inline constexpr EventType operator"" _recv(const char* evt, size_t)
 		{
 			return (EventType)hash(evt);
 		}

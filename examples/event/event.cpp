@@ -22,14 +22,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <iostream>
 #include "raz/event.hpp"
 
-using namespace raz::literal; // for the _event and _recv literal operators
+using namespace raz::literal; // for the _event literal operator
 
 struct FooEvent : public raz::Event<"foo"_event>
 {
 	int i;
 };
 
-struct FooReceiver : public raz::EventReceiver<"foo"_recv>
+struct FooReceiver
 {
 	void operator()(const FooEvent& e)
 	{
