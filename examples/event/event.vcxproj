@@ -126,7 +126,6 @@
   <ItemGroup>
     <ClInclude Include="..\..\include\raz\bitset.hpp" />
     <ClInclude Include="..\..\include\raz\event.hpp" />
-    <ClInclude Include="..\..\include\raz\hash.hpp" />
     <ClInclude Include="..\..\include\raz\memory.hpp" />
   </ItemGroup>
   <ItemGroup>
