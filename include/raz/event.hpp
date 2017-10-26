@@ -205,10 +205,10 @@ namespace raz
 			std::vector<EventRoute<Event>, raz::Allocator<EventRoute<Event>>> m_routes;
 		};
 
-		class CustomRouteDeleter
+		class EventRouteTableDeleter
 		{
 		public:
-			CustomRouteDeleter(IMemoryPool* memory) :
+			EventRouteTableDeleter(IMemoryPool* memory) :
 				m_memory(memory)
 			{
 			}
@@ -248,7 +248,7 @@ namespace raz
 		mutable std::recursive_mutex m_mutex;
 		mutable int m_recursion;
 		IMemoryPool* m_memory;
-		std::map<std::type_index, std::unique_ptr<IEventRouteTable, CustomRouteDeleter>> m_route_tables;
+		std::map<std::type_index, std::unique_ptr<IEventRouteTable, EventRouteTableDeleter>> m_route_tables;
 
 		template<class Event>
 		EventRouteTable<Event>* getRouteTable()
