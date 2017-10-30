@@ -22,6 +22,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -34,8 +35,8 @@ namespace raz
 	class EventDispatcher
 	{
 	public:
-		template<class Event, class Cookie = void>
-		using EventRouteCondition = bool(*)(const Event&, Cookie*);
+		template<class Event>
+		using EventCondition = std::function<bool(const Event&)>;
 
 		EventDispatcher(IMemoryPool* memory = nullptr) :
 			m_memory(memory),
@@ -43,13 +44,14 @@ namespace raz
 		{
 		}
 
-		template<class Event, class Cookie = void, class EventReceiver = void>
-		void addEventRoute(EventReceiver* receiver, EventRouteCondition<Event, Cookie> condition = nullptr, int route_id = 0)
+		template<class Event, class EventReceiver>
+		void addEventRoute(EventReceiver* receiver, EventCondition<Event> condition = {}, int route_id = 0)
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 			RecursionGuard rguard(m_recursion);
 
-			getRouteTable<Event>()->add(receiver, condition, route_id);
+			EventCondition<Event> condition_repack(std::allocator_arg, raz::Allocator<char>(m_memory), condition);
+			getRouteTable<Event>()->add(receiver, std::move(condition_repack), route_id);
 		}
 
 		template<class Event>
@@ -61,8 +63,8 @@ namespace raz
 			getRouteTable<Event>()->remove(route_id);
 		}
 
-		template<class Event, class Cookie = void>
-		void dispatch(const Event& e, Cookie* cookie = nullptr) const
+		template<class Event>
+		void dispatch(const Event& e) const
 		{
 			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
 			RecursionGuard rguard(m_recursion);
@@ -70,7 +72,7 @@ namespace raz
 			const auto* table = getRouteTable<Event>();
 			if (table)
 			{
-				table->handle(e, cookie);
+				table->handle(e);
 			}
 		}
 
@@ -89,22 +91,17 @@ namespace raz
 		{
 		};
 
-		struct CookieTypeMismatch : public std::exception
-		{
-		};
-
 	private:
 		template<class Event>
 		class EventRoute
 		{
 		public:
-			template<class EventReceiver, class Cookie>
-			EventRoute(EventReceiver* receiver, EventRouteCondition<Event, Cookie> condition = nullptr, int route_id = 0) :
+			template<class EventReceiver>
+			EventRoute(EventReceiver* receiver, EventCondition<Event>&& condition = {}, int route_id = 0) :
 				m_route_id(route_id),
 				m_receiver(receiver),
 				m_handler(&__handler<EventReceiver>),
-				m_condition(reinterpret_cast<EventRouteCondition<Event>>(condition)),
-				m_cookie_type(typeid(Cookie))
+				m_condition(condition)
 			{
 			}
 
@@ -118,15 +115,9 @@ namespace raz
 				return m_receiver;
 			}
 
-			template<class Cookie>
-			void operator()(const Event& e, Cookie* cookie) const
+			void operator()(const Event& e) const
 			{
-				if (m_cookie_type != typeid(Cookie))
-				{
-					throw CookieTypeMismatch();
-				}
-
-				if (!m_condition || (m_condition && m_condition(e, cookie)))
+				if (!m_condition || (m_condition && m_condition(e)))
 				{
 					m_handler(m_receiver, e);
 				}
@@ -144,8 +135,7 @@ namespace raz
 			int m_route_id;
 			void* m_receiver;
 			EventHandler m_handler;
-			EventRouteCondition<Event> m_condition;
-			std::type_index m_cookie_type;
+			EventCondition<Event> m_condition;
 		};
 
 		class IEventRouteTable
@@ -164,10 +154,10 @@ namespace raz
 			{
 			}
 
-			template<class EventReceiver, class Cookie>
-			void add(EventReceiver* receiver, EventRouteCondition<Event, Cookie> condition = nullptr, int route_id = 0)
+			template<class EventReceiver>
+			void add(EventReceiver* receiver, EventCondition<Event>&& condition = {}, int route_id = 0)
 			{
-				m_routes.emplace_back(receiver, condition, route_id);
+				m_routes.emplace_back(receiver, std::move(condition), route_id);
 			}
 
 			void remove(int route_id)
@@ -192,12 +182,11 @@ namespace raz
 				}
 			}
 
-			template<class Cookie>
-			void handle(const Event& e, Cookie* cookie) const
+			void handle(const Event& e) const
 			{
 				for (auto& route : m_routes)
 				{
-					route(e, cookie);
+					route(e);
 				}
 			}
 

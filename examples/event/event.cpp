@@ -39,11 +39,12 @@ int main()
 {
 	raz::EventDispatcher dispatcher;
 
-	FooReceiver receiver;
+	FooReceiver receiver, conditional_receiver;
 	dispatcher.addEventRoute<FooEvent>(&receiver);
+	dispatcher.addEventRoute<FooEvent>(&conditional_receiver, [](const FooEvent& e) { return e.i > 0; });
 
-	FooEvent e{ 12345 };
-	dispatcher.dispatch(e);
+	dispatcher.dispatch(FooEvent{  123 });
+	dispatcher.dispatch(FooEvent{ -123 });
 
 	return 0;
 }
