@@ -179,7 +179,15 @@ namespace raz
 		}
 
 		template<class T>
-		typename std::enable_if_t<!std::is_arithmetic<T>::value, Serializer>& operator()(T& t)
+		typename std::enable_if_t<std::is_enum<T>::value, Serializer>&
+			operator()(T& t)
+		{
+			return (*this)( *reinterpret_cast<std::underlying_type_t<T>*>(&t) );
+		}
+
+		template<class T>
+		typename std::enable_if_t<!std::is_arithmetic<T>::value && !std::is_enum<T>::value, Serializer>&
+			operator()(T& t)
 		{
 			t(*this);
 			return *this;
