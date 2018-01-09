@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <tuple>
 #include <type_traits>
 
 namespace raz
@@ -178,6 +179,13 @@ namespace raz
 			return *this;
 		}
 
+		template<class... T>
+		Serializer& operator()(std::tuple<T...>& t)
+		{
+			serialize_tuple(t, std::make_index_sequence<sizeof...(T)>());
+			return *this;
+		}
+
 		template<class T>
 		typename std::enable_if_t<std::is_enum<T>::value, Serializer>&
 			operator()(T& t)
@@ -194,6 +202,18 @@ namespace raz
 		}
 
 	private:
+		template<class... T>
+		void serialize_tuple(std::tuple<T...>&t, std::index_sequence<> i)
+		{
+		}
+
+		template<class... T, size_t I0, size_t... I>
+		void serialize_tuple(std::tuple<T...>& t, std::index_sequence<I0, I...> i)
+		{
+			(*this)(std::get<I0>(t));
+			serialize_tuple(t, std::index_sequence<I...>());
+		}
+
 		static constexpr bool isBigEndian()
 		{
 			union

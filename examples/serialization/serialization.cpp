@@ -71,31 +71,36 @@ private:
 	size_t m_data_pos;
 };
 
+enum Bar
+{
+	BAR1 = 1,
+	BAR2 = 2,
+	BAR3 = 3
+};
+
 struct Foo
 {
-	enum Bar
-	{
-		BAR1,
-		BAR2,
-		BAR3
-	};
-
-	std::string member1;
-	int member2;
-	float member3;
-	Bar member4;
+	std::string str;
+	std::tuple<int, float> tup;
+	Bar bar;
 
 	template<class Serializer>
 	raz::EnableSerializer<Serializer> operator()(Serializer& serializer)
 	{
-		serializer(member1)(member2)(member3)(member4);
+		serializer(str)(tup)(bar);
+	}
+
+	friend std::ostream& operator<<(std::ostream& o, const Foo& foo)
+	{
+		o << foo.str << " - " << std::get<0>(foo.tup) << " - " << std::get<1>(foo.tup) << " - " << foo.bar;
+		return o;
 	}
 };
 
 int main()
 {
 	raz::Serializer<Buffer<1024>> serializer;
-	Foo foo_src = { "razzie", 99, 1.23f, Foo::Bar::BAR1 };
+	Foo foo_src = { "razzie", std::make_tuple( 100, 1.5f ), Bar::BAR1 };
 	Foo foo_dest;
 
 	serializer.setMode(raz::SerializationMode::SERIALIZE);
@@ -104,7 +109,7 @@ int main()
 	serializer.setMode(raz::SerializationMode::DESERIALIZE);
 	serializer(foo_dest);
 
-	std::cout << foo_dest.member1 << " - " << foo_dest.member2 << " - " << foo_dest.member3 << " - " << foo_dest.member4 << std::endl;
+	std::cout << foo_dest << std::endl;
 
 	return 0;
 }
