@@ -131,20 +131,22 @@ namespace raz
 			static constexpr bool has_parenthesis_op = decltype(test<T>(true))::value;
 
 			template<bool value>
-			static std::enable_if_t<value> _call(T& object, Args... args)
+			static std::enable_if_t<value, bool> _call(T& object, Args... args)
 			{
 				object(std::forward<Args>(args)...);
+				return true;
 			}
 
 			template<int value>
-			static std::enable_if_t<!value> _call(T& object, Args... args)
+			static std::enable_if_t<!value, bool> _call(T& object, Args... args)
 			{
+				return false;
 			}
 
 		public:
-			static void call(T& object, Args... args)
+			static bool call(T& object, Args... args)
 			{
-				_call<has_parenthesis_op>(object, std::forward<Args>(args)...);
+				return _call<has_parenthesis_op>(object, std::forward<Args>(args)...);
 			}
 		};
 
@@ -177,11 +179,11 @@ namespace raz
 						}
 						catch (std::exception& e)
 						{
-							OpCaller<std::exception&>::call(object, e);
+							if (!OpCaller<std::exception&>::call(object, e) && !OpCaller<std::exception_ptr>::call(object, std::current_exception())) throw;
 						}
 						catch (...)
 						{
-							OpCaller<std::exception_ptr>::call(object, std::current_exception());
+							if (!OpCaller<std::exception_ptr>::call(object, std::current_exception())) throw;
 						}
 					}
 
@@ -198,11 +200,11 @@ namespace raz
 					}
 					catch (std::exception& e)
 					{
-						OpCaller<std::exception&>::call(object, e);
+						if (!OpCaller<std::exception&>::call(object, e) && !OpCaller<std::exception_ptr>::call(object, std::current_exception())) throw;
 					}
 					catch (...)
 					{
-						OpCaller<std::exception_ptr>::call(object, std::current_exception());
+						if (!OpCaller<std::exception_ptr>::call(object, std::current_exception())) throw;
 					}
 
 					auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
