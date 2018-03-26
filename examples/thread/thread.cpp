@@ -98,11 +98,18 @@ void example03()
 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
 
+void example04()
+{
+	raz::TaskManager taskmgr;
+	taskmgr([] { std::cout << "hello from task" << std::endl; });
+}
+
 int main()
 {
 	example01();
 	example02();
 	example03();
+	example04();
 
 	return 0;
 }
