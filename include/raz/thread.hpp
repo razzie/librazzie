@@ -264,11 +264,32 @@ namespace raz
 		TaskManager& operator=(const TaskManager&) = delete;
 
 		template<class F, class... Args>
-		auto operator()(F fn, Args... args) -> std::shared_future<decltype(fn(args...))>
+		static auto pack(F fn, Args... args) -> std::shared_future<decltype(fn(args...))>
 		{
 			using R = decltype(fn(args...));
 
 			std::shared_future<R> result = std::async(std::launch::deferred, fn, std::forward<Args>(args)...);
+			return result;
+		}
+
+		template<class R, class C, class... Args>
+		static std::shared_future<R> pack(std::shared_ptr<C> obj, R(C::*fn)(Args...), Args... args)
+		{
+			auto converted_fn = [](std::shared_ptr<C> obj, R(C::*fn)(Args...), Args... args)->R
+			{
+				return obj->*fn(std::forward<Args>(args)...);
+			};
+
+			std::shared_future<R> result = std::async(std::launch::deferred, converted_fn, obj, fn, std::forward<Args>(args)...);
+			return result;
+		}
+
+		template<class F, class... Args>
+		auto operator()(F fn, Args... args) -> std::shared_future<decltype(fn(args...))>
+		{
+			using R = decltype(fn(args...));
+
+			std::shared_future<R> result = pack(fn, std::forward<Args>(args)...);
 
 			std::lock_guard<std::mutex> guard(m_mutex);
 			m_tasklist.push_back([result] { result.wait(); });
@@ -279,12 +300,7 @@ namespace raz
 		template<class R, class C, class... Args>
 		std::shared_future<R> operator()(std::shared_ptr<C> obj, R(C::*fn)(Args...), Args... args)
 		{
-			auto converted_fn = [](std::shared_ptr<C> obj, R(C::*fn)(Args...), Args... args)->R
-			{
-				return obj->*fn(std::forward<Args>(args)...);
-			};
-
-			std::shared_future<R> result = std::async(std::launch::deferred, converted_fn, obj, fn, std::forward<Args>(args)...);
+			std::shared_future<R> result = pack(obj, fn, std::forward<Args>(args)...);
 
 			std::lock_guard<std::mutex> guard(m_mutex);
 			m_tasklist.push_back([result] { result.wait(); });
