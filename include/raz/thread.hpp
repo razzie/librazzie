@@ -24,6 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <exception>
 #include <functional>
 #include <future>
+#include <list>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -218,6 +219,111 @@ namespace raz
 			catch (...)
 			{
 				m_thread_result.set_exception(std::current_exception());
+			}
+		}
+	};
+
+	class TaskManager
+	{
+	public:
+		TaskManager(size_t threads = 0, IMemoryPool* memory = nullptr) :
+			m_threads(memory),
+			m_tasklist(memory),
+			m_exit_token(std::allocator_arg, raz::Allocator<int>(memory))
+		{
+			if (threads == 0)
+			{
+				threads = std::thread::hardware_concurrency();
+				if (threads == 0)
+				{
+					threads = 1;
+				}
+			}
+
+			std::shared_future<void> exit_token_future = m_exit_token.get_future();
+
+			m_threads.reserve(threads);
+			for (size_t i = 0; i < threads; ++i)
+				m_threads.push_back(std::thread(&TaskManager::run, this, exit_token_future));
+		}
+
+		~TaskManager()
+		{
+			m_mutex.lock();
+			m_notifier.notify_all();
+			m_mutex.unlock();
+
+			m_exit_token.set_value();
+
+			for (auto& thread : m_threads)
+				thread.join();
+		}
+
+		TaskManager(const TaskManager&) = delete;
+
+		TaskManager& operator=(const TaskManager&) = delete;
+
+		template<class F, class... Args>
+		auto operator()(F fn, Args... args) -> std::shared_future<decltype(fn(args...))>
+		{
+			using R = decltype(fn(args...));
+
+			std::shared_future<R> result = std::async(std::launch::deferred, fn, std::forward<Args>(args)...);
+
+			std::lock_guard<std::mutex> guard(m_mutex);
+			m_tasklist.push_back([result] { result.wait(); });
+			m_notifier.notify_one();
+			return result;
+		}
+
+		template<class R, class C, class... Args>
+		std::shared_future<R> operator()(std::shared_ptr<C> obj, R(C::*fn)(Args...), Args... args)
+		{
+			auto converted_fn = [](std::shared_ptr<C> obj, R(C::*fn)(Args...), Args... args)->R
+			{
+				return obj->*fn(std::forward<Args>(args)...);
+			};
+
+			std::shared_future<R> result = std::async(std::launch::deferred, converted_fn, obj, fn, std::forward<Args>(args)...);
+
+			std::lock_guard<std::mutex> guard(m_mutex);
+			m_tasklist.push_back([result] { result.wait(); });
+			m_notifier.notify_one();
+			return result;
+		}
+
+	private:
+		typedef std::function<void()> Task;
+
+		std::vector<std::thread, raz::Allocator<std::thread>> m_threads;
+		std::list<Task, raz::Allocator<Task>> m_tasklist;
+		std::mutex m_mutex;
+		std::condition_variable m_notifier;
+		std::promise<void> m_exit_token;
+
+		void run(std::shared_future<void> exit_token)
+		{
+			while (true)
+			{
+				{
+					std::unique_lock<std::mutex> lock(m_mutex);
+					m_notifier.wait(lock);
+
+					if (!m_tasklist.empty())
+					{
+						auto task = std::move(m_tasklist.front());
+						m_tasklist.pop_front();
+
+						lock.unlock();
+						task();
+					}
+				}
+
+				auto exit_status = exit_token.wait_for(std::chrono::milliseconds(1));
+				if (exit_status == std::future_status::ready)
+				{
+					return;
+				}
 			}
 		}
 	};
