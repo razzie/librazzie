@@ -22,29 +22,49 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <iostream>
 #include "raz/event.hpp"
 
-struct FooEvent
+struct XEvent
 {
-	int i;
+	int x;
 };
 
-struct FooReceiver
+struct YEvent
 {
-	void operator()(const FooEvent& e)
+	float y;
+};
+
+struct ZEvent
+{
+	bool z;
+};
+
+struct XYZEventReceiver : /* public */ raz::EventReceiver<XYZEventReceiver>
+{
+	void operator()(const XEvent& e)
 	{
-		std::cout << e.i << std::endl;
+		std::cout << "XEvent: " << e.x << std::endl;
+	}
+
+	void operator()(const YEvent& e)
+	{
+		std::cout << "YEvent: " << e.y << std::endl;
+	}
+
+	void operator()(const ZEvent& e)
+	{
+		std::cout << "ZEvent: " << e.z << std::endl;
 	}
 };
 
 int main()
 {
-	raz::EventDispatcher dispatcher;
+	raz::TaskManager taskmgr;
+	raz::EventDispatcher dispatcher(&taskmgr);
 
-	FooReceiver receiver, conditional_receiver;
-	dispatcher.addEventRoute<FooEvent>(&receiver);
-	dispatcher.addEventRoute<FooEvent>(&conditional_receiver, [](const FooEvent& e) { return e.i > 0; });
+	auto receiver = std::make_shared<XYZEventReceiver>();
+	receiver->bind<XEvent, YEvent, ZEvent>(dispatcher);
 
-	dispatcher.dispatch(FooEvent{  123 });
-	dispatcher.dispatch(FooEvent{ -123 });
+	XEvent e{ 123 };
+	dispatcher(e);
 
 	return 0;
 }
