@@ -30,6 +30,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <vector>
 #include "raz/thread.hpp"
 
+#define RAZ_AUTOREMOVE_EXPIRED_EVENTRECEIVER
+
 namespace raz
 {
 	class EventDispatcher
@@ -44,7 +46,7 @@ namespace raz
 		}
 
 		template<class Event>
-		void operator()(const Event& e)
+		void operator()(const Event& evt)
 		{
 			std::unique_lock<std::mutex> lock(m_mutex);
 			auto& handlers = getEventHandlerList(typeid(Event));
@@ -52,14 +54,14 @@ namespace raz
 			if (m_taskmgr)
 			{
 				for (auto& handler : handlers)
-					m_taskmgr->operator()(handler, &e);
+					m_taskmgr->operator()(handler, &evt, &handler);
 			}
 			else
 			{
 				std::vector<std::shared_future<void>, raz::Allocator<std::shared_future<void>>> tasks(m_memory);
 
 				for (auto& handler : handlers)
-					tasks.push_back(TaskManager::pack(handler, &e));
+					tasks.push_back(TaskManager::pack(handler, &evt, &handler));
 
 				lock.unlock();
 
@@ -81,7 +83,7 @@ namespace raz
 		}
 
 	private:
-		typedef std::function<void(const void*)> EventHandler;
+		typedef std::function<void(const void*, const void*)> EventHandler;
 		typedef std::vector<EventHandler, raz::Allocator<EventHandler>> EventHandlerList;
 
 		std::mutex m_mutex;
@@ -91,12 +93,12 @@ namespace raz
 			     std::less<std::type_index>,
 			     raz::Allocator<std::pair<const std::type_index, EventHandlerList>>> m_handlers;
 
-		EventHandlerList& getEventHandlerList(std::type_index e_type)
+		EventHandlerList& getEventHandlerList(std::type_index evt_type)
 		{
-			auto it = m_handlers.find(e_type);
+			auto it = m_handlers.find(evt_type);
 			if (it == m_handlers.end())
 			{
-				return m_handlers.emplace(e_type, m_memory).first->second;
+				return m_handlers.emplace(evt_type, m_memory).first->second;
 			}
 			else
 			{
@@ -108,17 +110,38 @@ namespace raz
 		void bindEventReceiver(std::shared_ptr<EventReceiver> receiver)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
-			getEventHandlerList(typeid(Event)).push_back(std::bind(handler<Event, EventReceiver>, receiver, std::placeholders::_1));
+			auto handler = std::bind(&EventDispatcher::wrappedEventHandler<Event, EventReceiver>, this, receiver, std::placeholders::_1, std::placeholders::_2);
+			getEventHandlerList(typeid(Event)).push_back(std::move(handler));
+		}
+
+		void removeEventHandler(std::type_index evt_type, const void* handler)
+		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+			auto& handlers = getEventHandlerList(evt_type);
+			for (auto it = handlers.begin(), end = handlers.end(); it != end; ++it)
+			{
+				if (&*it == handler)
+				{
+					handlers.erase(it);
+					return;
+				}
+			}
 		}
 
 		template<class Event, class EventReceiver>
-		static void handler(std::weak_ptr<EventReceiver>&& ptr, const void* e)
+		void wrappedEventHandler(std::weak_ptr<EventReceiver>&& ptr, const void* evt, const void* this_handler)
 		{
 			auto receiver = ptr.lock();
 			if (receiver)
 			{
-				receiver->operator()( *reinterpret_cast<const Event*>(e) );
+				receiver->operator()( *reinterpret_cast<const Event*>(evt) );
 			}
+#ifdef RAZ_AUTOREMOVE_EXPIRED_EVENTRECEIVER
+			else
+			{
+				removeEventHandler(typeid(Event), this_handler);
+			}
+#endif // RAZ_AUTOREMOVE_EXPIRED_EVENTRECEIVER
 		}
 	};
 
