@@ -28,240 +28,108 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <mutex>
 #include <typeindex>
 #include <vector>
-#include "raz/memory.hpp"
+#include "raz/thread.hpp"
 
 namespace raz
 {
 	class EventDispatcher
 	{
 	public:
-		template<class Event>
-		using EventCondition = std::function<bool(const Event&)>;
-
-		EventDispatcher(IMemoryPool* memory = nullptr) :
+		EventDispatcher(TaskManager* taskmgr, IMemoryPool* memory = nullptr) :
+			m_taskmgr(taskmgr),
 			m_memory(memory),
-			m_recursion(0)
+			m_handlers(memory)
 		{
+
+		}
+
+		template<class Event>
+		void operator()(const Event& e)
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			auto& handlers = getEventHandlerList(typeid(Event));
+
+			if (m_taskmgr)
+			{
+				for (auto& handler : handlers)
+					m_taskmgr->operator()(handler, &e);
+			}
+			else
+			{
+				std::vector<std::shared_future<void>, raz::Allocator<std::shared_future<void>>> tasks(m_memory);
+
+				for (auto& handler : handlers)
+					tasks.push_back(TaskManager::pack(handler, &e));
+
+				lock.unlock();
+
+				for (auto& task : tasks)
+					task.wait();
+			}
+		}
+
+		template<class Event0, class... Events, class EventReceiver>
+		void bind(std::shared_ptr<EventReceiver> receiver)
+		{
+			bindEventReceiver<Event0>(receiver);
+			bind<Events...>(receiver);
+		}
+
+		template<class EventReceiver>
+		void bind(std::shared_ptr<EventReceiver> receiver)
+		{
+		}
+
+	private:
+		typedef std::function<void(const void*)> EventHandler;
+		typedef std::vector<EventHandler, raz::Allocator<EventHandler>> EventHandlerList;
+
+		std::mutex m_mutex;
+		TaskManager* m_taskmgr;
+		IMemoryPool* m_memory;
+		std::map<std::type_index, EventHandlerList,
+			     std::less<std::type_index>,
+			     raz::Allocator<std::pair<const std::type_index, EventHandlerList>>> m_handlers;
+
+		EventHandlerList& getEventHandlerList(std::type_index e_type)
+		{
+			auto it = m_handlers.find(e_type);
+			if (it == m_handlers.end())
+			{
+				return m_handlers.emplace(e_type, m_memory).first->second;
+			}
+			else
+			{
+				return it->second;
+			}
 		}
 
 		template<class Event, class EventReceiver>
-		void addEventRoute(EventReceiver* receiver, EventCondition<Event> condition = {}, int route_id = 0)
+		void bindEventReceiver(std::shared_ptr<EventReceiver> receiver)
 		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			RecursionGuard rguard(m_recursion);
-
-			EventCondition<Event> condition_repack(std::allocator_arg, raz::Allocator<char>(m_memory), condition);
-			getRouteTable<Event>()->add(receiver, std::move(condition_repack), route_id);
+			std::lock_guard<std::mutex> guard(m_mutex);
+			getEventHandlerList(typeid(Event)).push_back(std::bind(handler<Event, EventReceiver>, receiver, std::placeholders::_1));
 		}
 
-		template<class Event>
-		void removeEventRoute(int route_id)
+		template<class Event, class EventReceiver>
+		static void handler(std::weak_ptr<EventReceiver>&& ptr, const void* e)
 		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			RecursionGuard rguard(m_recursion);
-
-			getRouteTable<Event>()->remove(route_id);
-		}
-
-		template<class Event>
-		void dispatch(const Event& e) const
-		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			RecursionGuard rguard(m_recursion);
-
-			const auto* table = getRouteTable<Event>();
-			if (table)
+			auto receiver = ptr.lock();
+			if (receiver)
 			{
-				table->handle(e);
+				receiver->operator()( *reinterpret_cast<const Event*>(e) );
 			}
 		}
+	};
 
-		void unbindReceiver(void* receiver)
+	template<class T>
+	class EventReceiver : public std::enable_shared_from_this<T>
+	{
+	public:
+		template<class... Events>
+		void bind(EventDispatcher& dispatcher)
 		{
-			std::lock_guard<decltype(m_mutex)> guard(m_mutex);
-			RecursionGuard rguard(m_recursion);
-
-			for (auto& it : m_route_tables)
-			{
-				it.second->remove(receiver);
-			}
-		}
-
-		struct RecursionDetected : public std::exception
-		{
-		};
-
-	private:
-		template<class Event>
-		class EventRoute
-		{
-		public:
-			template<class EventReceiver>
-			EventRoute(EventReceiver* receiver, EventCondition<Event>&& condition = {}, int route_id = 0) :
-				m_route_id(route_id),
-				m_receiver(receiver),
-				m_handler(&__handler<EventReceiver>),
-				m_condition(condition)
-			{
-			}
-
-			int getID() const
-			{
-				return m_route_id;
-			}
-
-			void* getvoid()
-			{
-				return m_receiver;
-			}
-
-			void operator()(const Event& e) const
-			{
-				if (!m_condition || (m_condition && m_condition(e)))
-				{
-					m_handler(m_receiver, e);
-				}
-			}
-
-		private:
-			typedef void(*EventHandler)(void*, const Event&);
-
-			template<class EventReceiver>
-			static void __handler(void* receiver, const Event& e)
-			{
-				static_cast<EventReceiver*>(receiver)->operator()(e);
-			}
-
-			int m_route_id;
-			void* m_receiver;
-			EventHandler m_handler;
-			EventCondition<Event> m_condition;
-		};
-
-		class IEventRouteTable
-		{
-		public:
-			virtual ~IEventRouteTable() = default;
-			virtual void remove(void* receiver) = 0;
-		};
-
-		template<class Event>
-		class EventRouteTable : public IEventRouteTable
-		{
-		public:
-			EventRouteTable(IMemoryPool* memory = nullptr) :
-				m_routes(memory)
-			{
-			}
-
-			template<class EventReceiver>
-			void add(EventReceiver* receiver, EventCondition<Event>&& condition = {}, int route_id = 0)
-			{
-				m_routes.emplace_back(receiver, std::move(condition), route_id);
-			}
-
-			void remove(int route_id)
-			{
-				for (auto it = m_routes.begin(); it != m_routes.end(); )
-				{
-					if (it->getID() == route_id)
-						it = m_routes.erase(it);
-					else
-						++it;
-				}
-			}
-
-			virtual void remove(void* receiver)
-			{
-				for (auto it = m_routes.begin(); it != m_routes.end(); )
-				{
-					if (it->getvoid() == receiver)
-						it = m_routes.erase(it);
-					else
-						++it;
-				}
-			}
-
-			void handle(const Event& e) const
-			{
-				for (auto& route : m_routes)
-				{
-					route(e);
-				}
-			}
-
-		private:
-			std::vector<EventRoute<Event>, raz::Allocator<EventRoute<Event>>> m_routes;
-		};
-
-		class EventRouteTableDeleter
-		{
-		public:
-			EventRouteTableDeleter(IMemoryPool* memory) :
-				m_memory(memory)
-			{
-			}
-
-			void operator()(IEventRouteTable* ptr)
-			{
-				if (m_memory)
-					m_memory->destroy(ptr);
-				else
-					delete ptr;
-			}
-
-		private:
-			IMemoryPool* m_memory;
-		};
-
-		class RecursionGuard
-		{
-		public:
-			RecursionGuard(int& recursion) : m_recursion(recursion)
-			{
-				if (m_recursion > 0)
-					throw RecursionDetected();
-
-				++m_recursion;
-			}
-
-			~RecursionGuard()
-			{
-				--m_recursion;
-			}
-
-		private:
-			int& m_recursion;
-		};
-
-		mutable std::recursive_mutex m_mutex;
-		mutable int m_recursion;
-		IMemoryPool* m_memory;
-		std::map<std::type_index, std::unique_ptr<IEventRouteTable, EventRouteTableDeleter>> m_route_tables;
-
-		template<class Event>
-		EventRouteTable<Event>* getRouteTable()
-		{
-			auto it = m_route_tables.find(typeid(Event));
-			if (it == m_route_tables.end())
-			{
-				decltype(m_route_tables)::mapped_type ptr(
-					m_memory ? m_memory->create<EventRouteTable<Event>>(m_memory) : new EventRouteTable<Event>(),
-					m_memory);
-				it = m_route_tables.emplace(typeid(Event), std::move(ptr)).first;
-			}
-
-			return static_cast<EventRouteTable<Event>*>(it->second.get());
-		}
-
-		template<class Event>
-		const EventRouteTable<Event>* getRouteTable() const
-		{
-			auto it = m_route_tables.find(typeid(Event));
-			if (it == m_route_tables.end())
-				return nullptr;
-
-			return static_cast<const EventRouteTable<Event>*>(it->second.get());
+			dispatcher.bind<Events...>(shared_from_this());
 		}
 	};
 }

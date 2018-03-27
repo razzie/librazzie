@@ -127,6 +127,7 @@
     <ClInclude Include="..\..\include\raz\bitset.hpp" />
     <ClInclude Include="..\..\include\raz\event.hpp" />
     <ClInclude Include="..\..\include\raz\memory.hpp" />
+    <ClInclude Include="..\..\include\raz\thread.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="event.cpp" />
