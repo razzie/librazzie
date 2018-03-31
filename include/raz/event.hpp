@@ -98,11 +98,24 @@ namespace raz
 		{
 		}
 
+		template<class Event0, class... Events, class EventReceiver>
+		void unbind(EventReceiver* receiver)
+		{
+			unbindEventReceiver<Event0>(receiver);
+			unbind<Events...>(receiver);
+		}
+
+		template<class EventReceiver>
+		void unbind(EventReceiver* receiver)
+		{
+		}
+
 	private:
 		class IEventHandler
 		{
 		public:
 			virtual ~IEventHandler() = default;
+			virtual bool hasEventReceiver(void*) const = 0;
 			virtual void onDispatcherDestroyed() = 0;
 		};
 
@@ -119,7 +132,8 @@ namespace raz
 		public:
 			EventHandlerImpl(EventDispatcher* dispatcher, std::shared_ptr<EventReceiver> receiver) :
 				m_dispatcher(dispatcher),
-				m_receiver(receiver)
+				m_receiver(receiver),
+				m_receiver_ptr_unsafe(receiver.get())
 			{
 			}
 
@@ -136,6 +150,11 @@ namespace raz
 				}
 			}
 
+			virtual bool hasEventReceiver(void* receiver) const
+			{
+				return (m_receiver_ptr_unsafe == receiver);
+			}
+
 			virtual void onDispatcherDestroyed()
 			{
 				m_dispatcher = nullptr;
@@ -144,6 +163,7 @@ namespace raz
 		private:
 			EventDispatcher* m_dispatcher;
 			std::weak_ptr<EventReceiver> m_receiver;
+			EventReceiver* m_receiver_ptr_unsafe;
 		};
 
 		typedef std::shared_ptr<IEventHandler> EventHandlerPtr;
@@ -177,6 +197,21 @@ namespace raz
 			getEventHandlerList(typeid(Event)).push_back(handler);
 		}
 
+		template<class Event, class EventReceiver>
+		void unbindEventReceiver(EventReceiver* receiver)
+		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+			auto& handlers = getEventHandlerList(typeid(Event));
+			for (auto it = handlers.begin(), end = handlers.end(); it != end; ++it)
+			{
+				if ((*it)->hasEventReceiver(receiver))
+				{
+					handlers.erase(it);
+					return;
+				}
+			}
+		}
+
 		void removeEventHandler(std::type_index evt_type, IEventHandler* handler)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
@@ -200,6 +235,12 @@ namespace raz
 		void bind(EventDispatcher& dispatcher)
 		{
 			dispatcher.bind<Events...>(shared_from_this());
+		}
+
+		template<class... Events>
+		void unbind(EventDispatcher& dispatcher)
+		{
+			dispatcher.unbind<Events...>(this);
 		}
 	};
 }
