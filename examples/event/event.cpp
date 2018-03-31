@@ -63,8 +63,8 @@ int main()
 	auto receiver = std::make_shared<XYZEventReceiver>();
 	receiver->bind<XEvent, YEvent, ZEvent>(dispatcher);
 
-	XEvent e{ 123 };
-	dispatcher(e);
+	dispatcher(XEvent{ 123 });
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
 	return 0;
 }
