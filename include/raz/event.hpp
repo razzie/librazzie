@@ -30,8 +30,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <vector>
 #include "raz/thread.hpp"
 
-#define RAZ_AUTOREMOVE_EXPIRED_EVENTRECEIVER
-
 namespace raz
 {
 	class EventDispatcher
@@ -45,8 +43,20 @@ namespace raz
 
 		}
 
+		~EventDispatcher()
+		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+			for (auto& handler_list : m_handlers)
+			{
+				for (auto& handler : handler_list.second)
+				{
+					handler->onDispatcherDestroyed();
+				}
+			}
+		}
+
 		template<class Event>
-		void operator()(const Event& evt)
+		void operator()(Event event)
 		{
 			std::unique_lock<std::mutex> lock(m_mutex);
 			auto& handlers = getEventHandlerList(typeid(Event));
@@ -54,14 +64,20 @@ namespace raz
 			if (m_taskmgr)
 			{
 				for (auto& handler : handlers)
-					m_taskmgr->operator()(handler, &evt, &handler);
+				{
+					auto ptr = std::static_pointer_cast<EventHandler<Event>>(handler);
+					m_taskmgr->operator()(ptr, event);
+				}
 			}
 			else
 			{
 				std::vector<std::shared_future<void>, raz::Allocator<std::shared_future<void>>> tasks(m_memory);
 
 				for (auto& handler : handlers)
-					tasks.push_back(TaskManager::pack(handler, &evt, &handler));
+				{
+					auto ptr = std::static_pointer_cast<EventHandler<Event>>(handler);
+					tasks.push_back(TaskManager::pack(ptr, event));
+				}
 
 				lock.unlock();
 
@@ -83,8 +99,55 @@ namespace raz
 		}
 
 	private:
-		typedef std::function<void(const void*, const void*)> EventHandler;
-		typedef std::vector<EventHandler, raz::Allocator<EventHandler>> EventHandlerList;
+		class IEventHandler
+		{
+		public:
+			virtual ~IEventHandler() = default;
+			virtual void onDispatcherDestroyed() = 0;
+		};
+
+		template<class Event>
+		class EventHandler : public IEventHandler
+		{
+		public:
+			virtual void operator()(const Event&) = 0;
+		};
+
+		template<class EventReceiver, class Event>
+		class EventHandlerImpl : public EventHandler<Event>
+		{
+		public:
+			EventHandlerImpl(EventDispatcher* dispatcher, std::shared_ptr<EventReceiver> receiver) :
+				m_dispatcher(dispatcher),
+				m_receiver(receiver)
+			{
+			}
+
+			virtual void operator()(const Event& event)
+			{
+				auto receiver = m_receiver.lock();
+				if (receiver)
+				{
+					receiver->operator()(event);
+				}
+				else if (m_dispatcher)
+				{
+					m_dispatcher->removeEventHandler(typeid(Event), this);
+				}
+			}
+
+			virtual void onDispatcherDestroyed()
+			{
+				m_dispatcher = nullptr;
+			}
+
+		private:
+			EventDispatcher* m_dispatcher;
+			std::weak_ptr<EventReceiver> m_receiver;
+		};
+
+		typedef std::shared_ptr<IEventHandler> EventHandlerPtr;
+		typedef std::vector<EventHandlerPtr, raz::Allocator<EventHandlerPtr>> EventHandlerList;
 
 		std::mutex m_mutex;
 		TaskManager* m_taskmgr;
@@ -110,38 +173,22 @@ namespace raz
 		void bindEventReceiver(std::shared_ptr<EventReceiver> receiver)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
-			auto handler = std::bind(&EventDispatcher::wrappedEventHandler<Event, EventReceiver>, this, receiver, std::placeholders::_1, std::placeholders::_2);
-			getEventHandlerList(typeid(Event)).push_back(std::move(handler));
+			auto handler = std::make_shared<EventHandlerImpl<EventReceiver, Event>>(this, receiver);
+			getEventHandlerList(typeid(Event)).push_back(handler);
 		}
 
-		void removeEventHandler(std::type_index evt_type, const void* handler)
+		void removeEventHandler(std::type_index evt_type, IEventHandler* handler)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 			auto& handlers = getEventHandlerList(evt_type);
 			for (auto it = handlers.begin(), end = handlers.end(); it != end; ++it)
 			{
-				if (&*it == handler)
+				if (it->get() == handler)
 				{
 					handlers.erase(it);
 					return;
 				}
 			}
-		}
-
-		template<class Event, class EventReceiver>
-		void wrappedEventHandler(std::weak_ptr<EventReceiver>&& ptr, const void* evt, const void* this_handler)
-		{
-			auto receiver = ptr.lock();
-			if (receiver)
-			{
-				receiver->operator()( *reinterpret_cast<const Event*>(evt) );
-			}
-#ifdef RAZ_AUTOREMOVE_EXPIRED_EVENTRECEIVER
-			else
-			{
-				removeEventHandler(typeid(Event), this_handler);
-			}
-#endif // RAZ_AUTOREMOVE_EXPIRED_EVENTRECEIVER
 		}
 	};
 
