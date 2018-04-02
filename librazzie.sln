@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 14 for Windows Desktop
-VisualStudioVersion = 14.0.24720.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2024
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "functional", "examples\functional\functional.vcxproj", "{F6F486AE-0130-4649-9ED3-55125DDD9522}"
 EndProject
@@ -22,6 +22,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "thread", "examples\thread\thread.vcxproj", "{CCFC9CA7-265F-4DC4-8ADA-C9E636EEDB20}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "logger", "examples\logger\logger.vcxproj", "{EB021299-ED6F-4E8F-A43F-4E87A8D82D74}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "input", "examples\input\input.vcxproj", "{A4BE9F63-6465-4508-97E2-6989287EEDE9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -111,8 +113,19 @@ Global
 		{EB021299-ED6F-4E8F-A43F-4E87A8D82D74}.Release|x64.Build.0 = Release|x64
 		{EB021299-ED6F-4E8F-A43F-4E87A8D82D74}.Release|x86.ActiveCfg = Release|Win32
 		{EB021299-ED6F-4E8F-A43F-4E87A8D82D74}.Release|x86.Build.0 = Release|Win32
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Debug|x64.ActiveCfg = Debug|x64
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Debug|x64.Build.0 = Debug|x64
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Debug|x86.ActiveCfg = Debug|Win32
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Debug|x86.Build.0 = Debug|Win32
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Release|x64.ActiveCfg = Release|x64
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Release|x64.Build.0 = Release|x64
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Release|x86.ActiveCfg = Release|Win32
+		{A4BE9F63-6465-4508-97E2-6989287EEDE9}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {08E6D22F-BDFB-4FC4-9DDB-47690C2A62CD}
 	EndGlobalSection
 EndGlobal
