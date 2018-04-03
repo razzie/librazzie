@@ -49,7 +49,7 @@ namespace raz
 		typedef std::array<float, RAZ_INPUT_AXIS_DIMENSION> AxisValue;
 
 		Input() :
-			type(InputType::Unknown), button(0), axis(0), device(0), action(0)
+			type(InputType::Unknown), button(0), axis(0), device(0), action(0), handled(false)
 		{
 			axis_value.fill(0.f);
 			axis_delta.fill(0.f);
@@ -62,7 +62,7 @@ namespace raz
 		AxisValue axis_delta;
 		uint32_t device;
 		uint32_t action;
-		mutable bool handled = false;
+		mutable bool handled;
 	};
 
 	class Action;
@@ -71,14 +71,6 @@ namespace raz
 	class Action : public std::enable_shared_from_this<Action>
 	{
 	public:
-		virtual ~Action() = default;
-		virtual bool tryInput(const Input&) const = 0;
-
-		operator ActionPtr()
-		{
-			return shared_from_this();
-		}
-
 		static ActionPtr createButtonAction(uint32_t button, Input::InputType mask = static_cast<Input::InputType>(Input::ButtonPressed | Input::ButtonHold))
 		{
 			class ButtonAction : public Action
@@ -122,6 +114,14 @@ namespace raz
 			};
 
 			return std::make_shared<AxisAction>(axis);
+		}
+
+		virtual ~Action() = default;
+		virtual bool tryInput(const Input&) const = 0;
+
+		operator ActionPtr()
+		{
+			return shared_from_this();
 		}
 	};
 
@@ -183,12 +183,12 @@ namespace raz
 			return ID;
 		}
 
-		ButtonState getButtonState(uint32_t button)
+		ButtonState getButtonState(uint32_t button) const
 		{
 			return m_btn_states[button];
 		}
 
-		float getAxisValue(uint32_t axis)
+		const Input::AxisValue& getAxisValue(uint32_t axis) const
 		{
 			m_axis_values[axis];
 		}
@@ -245,8 +245,8 @@ namespace raz
 
 	typedef InputDevice<256, 0> CharKeyboard;
 	typedef InputDevice<~0u, 0> Keyboard;
-	typedef InputDevice<3, 3> Mouse;
-	template<uint32_t ID> using GamePad = typename InputDevice<12, 6, ID>;
+	typedef InputDevice<3, 2> Mouse; // three buttons + one XY axis and a mouse wheel one
+	template<uint32_t ID> using GamePad = typename InputDevice<12, 4, ID>;
 
 
 	template<class... InputDevices>
