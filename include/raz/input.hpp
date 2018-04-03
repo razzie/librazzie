@@ -130,11 +130,11 @@ namespace raz
 	class InputDevice
 	{
 	public:
-		enum ButtonState
+		enum ButtonState : unsigned
 		{
-			Released,
-			Pressed,
-			Hold
+			Released = (1 << 0),
+			Pressed =  (1 << 1),
+			Hold =     (1 << 2)
 		};
 
 		struct ButtonPressed
@@ -186,6 +186,12 @@ namespace raz
 		ButtonState getButtonState(uint32_t button) const
 		{
 			return m_btn_states[button];
+		}
+
+		bool isButtonDown(uint32_t button) const
+		{
+			unsigned mask = ButtonState::Hold | ButtonState::Pressed;
+			return (m_btn_states[button] & mask);
 		}
 
 		const Input::AxisValue& getAxisValue(uint32_t axis) const
