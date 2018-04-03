@@ -35,6 +35,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 namespace raz
 {
+	class IInputDevice;
+
 	struct Input
 	{
 		enum InputType : unsigned
@@ -49,85 +51,23 @@ namespace raz
 		typedef std::array<float, RAZ_INPUT_AXIS_DIMENSION> AxisValue;
 
 		Input() :
-			type(InputType::Unknown), button(0), axis(0), device(0), action(0), handled(false)
+			type(InputType::Unknown), action(0), button(0), axis(0), device(nullptr), handled(false)
 		{
 			axis_value.fill(0.f);
 			axis_delta.fill(0.f);
 		}
 
 		InputType type;
+		uint32_t action;
 		uint32_t button;
 		uint32_t axis;
 		AxisValue axis_value;
 		AxisValue axis_delta;
-		uint32_t device;
-		uint32_t action;
+		IInputDevice* device;
 		mutable bool handled;
 	};
 
-	class Action;
-	typedef std::shared_ptr<Action> ActionPtr;
-
-	class Action : public std::enable_shared_from_this<Action>
-	{
-	public:
-		static ActionPtr createButtonAction(uint32_t button, Input::InputType mask = static_cast<Input::InputType>(Input::ButtonPressed | Input::ButtonHold))
-		{
-			class ButtonAction : public Action
-			{
-			public:
-				ButtonAction(uint32_t button, Input::InputType mask) :
-					m_button(button), m_mask(mask)
-				{
-				}
-
-				virtual bool tryInput(const Input& input) const
-				{
-					return ((input.button == m_button) && (input.type & m_mask));
-				}
-
-			private:
-				uint32_t m_button;
-				Input::InputType m_mask;
-			};
-
-			return std::make_shared<ButtonAction>(button, mask);
-		}
-
-		static ActionPtr createAxisAction(uint32_t axis)
-		{
-			class AxisAction : public Action
-			{
-			public:
-				AxisAction(uint32_t axis) :
-					m_axis(axis)
-				{
-				}
-
-				virtual bool tryInput(const Input& input) const
-				{
-					return (input.axis == m_axis);
-				}
-
-			private:
-				uint32_t m_axis;
-			};
-
-			return std::make_shared<AxisAction>(axis);
-		}
-
-		virtual ~Action() = default;
-		virtual bool tryInput(const Input&) const = 0;
-
-		operator ActionPtr()
-		{
-			return shared_from_this();
-		}
-	};
-
-
-	template<uint32_t ButtonCount, uint32_t AxisCount, uint32_t ID = 0>
-	class InputDevice
+	class IInputDevice
 	{
 	public:
 		enum ButtonState : unsigned
@@ -137,6 +77,16 @@ namespace raz
 			Hold =     (1 << 2)
 		};
 
+		virtual uint32_t getID() const = 0;
+		virtual ButtonState getButtonState(uint32_t button) const = 0;
+		virtual bool isButtonDown(uint32_t button) const = 0;
+		virtual const Input::AxisValue& getAxisValue(uint32_t axis) const = 0;
+	};
+
+	template<uint32_t ButtonCount, uint32_t AxisCount, uint32_t ID = 0>
+	class InputDevice : public IInputDevice
+	{
+	public:
 		struct ButtonPressed
 		{
 			typedef InputDevice Device;
@@ -178,31 +128,31 @@ namespace raz
 				axis_value.fill(0.f);
 		}
 
-		static constexpr uint32_t getID()
+		virtual uint32_t getID() const
 		{
 			return ID;
 		}
 
-		ButtonState getButtonState(uint32_t button) const
+		virtual ButtonState getButtonState(uint32_t button) const
 		{
 			return m_btn_states[button];
 		}
 
-		bool isButtonDown(uint32_t button) const
+		virtual bool isButtonDown(uint32_t button) const
 		{
 			unsigned mask = ButtonState::Hold | ButtonState::Pressed;
 			return (m_btn_states[button] & mask);
 		}
 
-		const Input::AxisValue& getAxisValue(uint32_t axis) const
+		virtual const Input::AxisValue& getAxisValue(uint32_t axis) const
 		{
-			m_axis_values[axis];
+			return m_axis_values[axis];
 		}
 
 		Input operator()(ButtonPressed event)
 		{
 			auto& state = m_btn_states[event.button];
-			if (state == ButtonState::Pressed)
+			if (state == ButtonState::Pressed || state == ButtonState::Hold)
 				state = ButtonState::Hold;
 			else
 				state = ButtonState::Pressed;
@@ -210,7 +160,7 @@ namespace raz
 			Input input;
 			input.type = Input::ButtonPressed;
 			input.button = event.button;
-			input.device = ID;
+			input.device = this;
 			return input;
 		}
 
@@ -222,7 +172,7 @@ namespace raz
 			Input input;
 			input.type = Input::ButtonReleased;
 			input.button = event.button;
-			input.device = ID;
+			input.device = this;
 			return input;
 		}
 
@@ -238,14 +188,14 @@ namespace raz
 			input.axis_value = event.axis;
 			input.axis_delta = event.axis_value;
 			for (int i = 0; i < input.axis_delta.size(); ++i) input.axis_delta[i] -= old_axis_value[i];
-			input.device = ID;
+			input.device = this;
 			return input;
 		}
 
 	private:
-		std::conditional_t<(ButtonCount > 256),
-			typename std::map<uint32_t, ButtonState>,
-			typename std::array<ButtonState, ButtonCount>> m_btn_states;
+		mutable std::conditional_t<(ButtonCount > 256),
+			std::map<uint32_t, ButtonState>,
+			std::array<ButtonState, ButtonCount>> m_btn_states;
 		std::array<Input::AxisValue, AxisCount> m_axis_values;
 	};
 
@@ -254,6 +204,89 @@ namespace raz
 	typedef InputDevice<3, 2> Mouse; // three buttons + one XY axis and a mouse wheel one
 	template<uint32_t ID> using GamePad = typename InputDevice<12, 4, ID>;
 
+
+	class Action;
+	typedef std::shared_ptr<Action> ActionPtr;
+
+	class Action : public std::enable_shared_from_this<Action>
+	{
+	public:
+		static ActionPtr createButtonAction(uint32_t button, Input::InputType mask = static_cast<Input::InputType>(Input::ButtonPressed | Input::ButtonHold))
+		{
+			class ButtonAction : public Action
+			{
+			public:
+				ButtonAction(uint32_t button, Input::InputType mask) :
+					m_button(button), m_mask(mask)
+				{
+				}
+
+				virtual bool tryInput(const Input& input) const
+				{
+					return ((input.button == m_button) && (input.type & m_mask)) || tryDeviceInput(input.device);
+				}
+
+			private:
+				uint32_t m_button;
+				Input::InputType m_mask;
+
+				bool tryDeviceInput(const IInputDevice* device) const
+				{
+					auto btn_state = device->getButtonState(m_button);
+					auto input_type = mapButtonStateToInputType(btn_state);
+
+					return (input_type & m_mask);
+				}
+
+				static Input::InputType mapButtonStateToInputType(IInputDevice::ButtonState btn_state)
+				{
+					switch (btn_state)
+					{
+					case IInputDevice::Pressed:
+						return Input::ButtonPressed;
+					case IInputDevice::Hold:
+						return Input::ButtonHold;
+					case IInputDevice::Released:
+						return Input::ButtonReleased;
+					default:
+						return Input::Unknown;
+					}
+				}
+			};
+
+			return std::make_shared<ButtonAction>(button, mask);
+		}
+
+		static ActionPtr createAxisAction(uint32_t axis)
+		{
+			class AxisAction : public Action
+			{
+			public:
+				AxisAction(uint32_t axis) :
+					m_axis(axis)
+				{
+				}
+
+				virtual bool tryInput(const Input& input) const
+				{
+					return (input.axis == m_axis);
+				}
+
+			private:
+				uint32_t m_axis;
+			};
+
+			return std::make_shared<AxisAction>(axis);
+		}
+
+		virtual ~Action() = default;
+		virtual bool tryInput(const Input&) const = 0;
+
+		operator ActionPtr()
+		{
+			return shared_from_this();
+		}
+	};
 
 	template<class... InputDevices>
 	class ActionMap
