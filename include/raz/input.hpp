@@ -29,10 +29,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <type_traits>
 #include "raz/hash.hpp"
 
-#ifndef RAZ_INPUT_AXIS_DIMENSION
-#define RAZ_INPUT_AXIS_DIMENSION 2
-#endif
-
 namespace raz
 {
 	class IInputDevice;
@@ -45,24 +41,57 @@ namespace raz
 			ButtonPressed =  (1 << 1),
 			ButtonHold =     (1 << 2),
 			ButtonReleased = (1 << 3),
-			AxisChanged =    (1 << 4)
+			ChannelChanged =    (1 << 4)
 		};
 
-		typedef std::array<float, RAZ_INPUT_AXIS_DIMENSION> AxisValue;
+		struct ChannelValue
+		{
+			ChannelValue() :
+				primary(0.f), secondary(0.f)
+			{
+			}
+
+			ChannelValue(float value) :
+				primary(value), secondary(0.f)
+			{
+			}
+
+			ChannelValue(float primary, float secondary) :
+				primary(primary), secondary(secondary)
+			{
+			}
+
+			operator float() const
+			{
+				return primary;
+			}
+
+			ChannelValue operator-(const ChannelValue& other)
+			{
+				return ChannelValue(primary - other.primary, secondary - other.secondary);
+			}
+
+			// a channel should usually have a single value, but there are cases
+			// when we want them bundled (like mouse XY)
+			float primary;
+			float secondary;
+		};
 
 		Input() :
-			type(InputType::Unknown), action(0), button(0), axis(0), device(nullptr), handled(false)
+			type(InputType::Unknown), action(0),
+			button(0),
+			channel(0), channel_value(0.f), channel_delta(0.f),
+			device(nullptr),
+			handled(false)
 		{
-			axis_value.fill(0.f);
-			axis_delta.fill(0.f);
 		}
 
 		InputType type;
 		uint32_t action;
 		uint32_t button;
-		uint32_t axis;
-		AxisValue axis_value;
-		AxisValue axis_delta;
+		uint32_t channel;
+		ChannelValue channel_value;
+		ChannelValue channel_delta;
 		IInputDevice* device;
 		mutable bool handled;
 	};
@@ -77,13 +106,16 @@ namespace raz
 			Hold =     (1 << 2)
 		};
 
+		typedef Input::ChannelValue(*ChannelCharacteristics)(const Input::ChannelValue&);
+
 		virtual uint32_t getID() const = 0;
 		virtual ButtonState getButtonState(uint32_t button) const = 0;
 		virtual bool isButtonDown(uint32_t button) const = 0;
-		virtual const Input::AxisValue& getAxisValue(uint32_t axis) const = 0;
+		virtual const Input::ChannelValue& getChannelValue(uint32_t channel) const = 0;
+		virtual void setChannelCharacteristics(uint32_t channel, ChannelCharacteristics) = 0;
 	};
 
-	template<uint32_t ButtonCount, uint32_t AxisCount, uint32_t ID = 0>
+	template<uint32_t ButtonCount, uint32_t ChannelCount, uint32_t ID = 0>
 	class InputDevice : public IInputDevice
 	{
 	public:
@@ -109,23 +141,21 @@ namespace raz
 			uint32_t button;
 		};
 
-		struct AxisChanged
+		struct ChannelChanged
 		{
 			typedef InputDevice Device;
 
-			AxisChanged(uint32_t axis, Input::AxisValue axis_value) :
-				axis(axis), axis_value(axis_value)
+			ChannelChanged(uint32_t channel, Input::ChannelValue channel_value) :
+				channel(channel), channel_value(channel_value)
 			{
 			}
 
-			uint32_t axis;
-			Input::AxisValue axis_value;
+			uint32_t channel;
+			Input::ChannelValue channel_value;
 		};
 
 		InputDevice()
 		{
-			for (auto& axis_value : m_axis_values)
-				axis_value.fill(0.f);
 		}
 
 		virtual uint32_t getID() const
@@ -144,9 +174,14 @@ namespace raz
 			return (m_btn_states[button] & mask);
 		}
 
-		virtual const Input::AxisValue& getAxisValue(uint32_t axis) const
+		virtual const Input::ChannelValue& getChannelValue(uint32_t channel) const
 		{
-			return m_axis_values[axis];
+			return m_channel_values[channel];
+		}
+
+		virtual void setChannelCharacteristics(uint32_t channel, ChannelCharacteristics fn)
+		{
+			m_channel_characteristics[channel] = fn;
 		}
 
 		Input operator()(ButtonPressed event)
@@ -176,18 +211,18 @@ namespace raz
 			return input;
 		}
 
-		Input operator()(AxisChanged event)
+		Input operator()(ChannelChanged event)
 		{
-			auto& axis_value = m_axis_values[event.axis];
-			auto old_axis_value = axis_value;
-			axis_value = event.axis_value;
+			auto& channel_value = m_channel_values[event.channel];
+			auto characteristics = m_channel_characteristics[event.channel];
+			auto old_channel_value = channel_value;
+			channel_value = event.channel_value;
 
 			Input input;
-			input.type = Input::AxisChanged;
-			input.axis = event.axis;
-			input.axis_value = event.axis;
-			input.axis_delta = event.axis_value;
-			for (int i = 0; i < input.axis_delta.size(); ++i) input.axis_delta[i] -= old_axis_value[i];
+			input.type = Input::ChannelChanged;
+			input.channel = event.channel;
+			input.channel_value = (characteristics) ? characteristics(event.channel_value) : event.channel_value;
+			input.channel_delta = event.channel_value - old_channel_value;
 			input.device = this;
 			return input;
 		}
@@ -196,12 +231,13 @@ namespace raz
 		mutable std::conditional_t<(ButtonCount > 256),
 			std::map<uint32_t, ButtonState>,
 			std::array<ButtonState, ButtonCount>> m_btn_states;
-		std::array<Input::AxisValue, AxisCount> m_axis_values;
+		std::array<Input::ChannelValue, ChannelCount> m_channel_values;
+		std::array<ChannelCharacteristics, ChannelCount> m_channel_characteristics;
 	};
 
 	typedef InputDevice<256, 0> CharKeyboard;
 	typedef InputDevice<~0u, 0> Keyboard;
-	typedef InputDevice<3, 2> Mouse; // three buttons + one XY axis and a mouse wheel one
+	typedef InputDevice<3, 2> Mouse; // three buttons + one XY bundled channel and a mouse wheel one
 	template<uint32_t ID> using GamePad = typename InputDevice<12, 4, ID>;
 
 
@@ -257,26 +293,26 @@ namespace raz
 			return std::make_shared<ButtonAction>(button, mask);
 		}
 
-		static ActionPtr createAxisAction(uint32_t axis)
+		static ActionPtr createChannelAction(uint32_t channel)
 		{
-			class AxisAction : public Action
+			class ChannelAction : public Action
 			{
 			public:
-				AxisAction(uint32_t axis) :
-					m_axis(axis)
+				ChannelAction(uint32_t channel) :
+					m_channel(channel)
 				{
 				}
 
 				virtual bool tryInput(const Input& input) const
 				{
-					return (input.axis == m_axis);
+					return (input.channel == m_channel);
 				}
 
 			private:
-				uint32_t m_axis;
+				uint32_t m_channel;
 			};
 
-			return std::make_shared<AxisAction>(axis);
+			return std::make_shared<ChannelAction>(channel);
 		}
 
 		virtual ~Action() = default;
@@ -300,6 +336,18 @@ namespace raz
 		void unbind(uint32_t action_id)
 		{
 			m_actions.erase(action_id);
+		}
+
+		template<class Device>
+		Device& getInputDevice()
+		{
+			return std::get<Device>(m_devices);
+		}
+
+		template<class Device>
+		const Device& getInputDevice() const
+		{
+			return std::get<Device>(m_devices);
 		}
 
 		template<class InputEvent, class... Handlers>
