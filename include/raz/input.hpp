@@ -39,9 +39,9 @@ namespace raz
 		{
 			Unknown =        (1 << 0),
 			ButtonPressed =  (1 << 1),
-			ButtonHold =     (1 << 2),
+			ButtonHeld =     (1 << 2),
 			ButtonReleased = (1 << 3),
-			ChannelChanged =    (1 << 4)
+			ChannelChanged = (1 << 4)
 		};
 
 		struct ChannelValue
@@ -103,7 +103,7 @@ namespace raz
 		{
 			Released = 0,
 			Pressed,
-			Hold
+			Held
 		};
 
 		typedef Input::ChannelValue(*ChannelCharacteristics)(const Input::ChannelValue&);
@@ -168,7 +168,7 @@ namespace raz
 
 		virtual bool isButtonDown(uint32_t button) const
 		{
-			unsigned mask = ButtonState::Hold | ButtonState::Pressed;
+			unsigned mask = ButtonState::Held | ButtonState::Pressed;
 			return (m_btn_states[button] & mask);
 		}
 
@@ -185,8 +185,8 @@ namespace raz
 		Input operator()(ButtonPressed event)
 		{
 			auto& state = m_btn_states[event.button];
-			if (state == ButtonState::Pressed || state == ButtonState::Hold)
-				state = ButtonState::Hold;
+			if (state == ButtonState::Pressed || state == ButtonState::Held)
+				state = ButtonState::Held;
 			else
 				state = ButtonState::Pressed;
 
@@ -245,7 +245,7 @@ namespace raz
 	{
 	public:
 		template<class Device>
-		static ActionPtr button(uint32_t button, Input::InputType mask = static_cast<Input::InputType>(Input::ButtonPressed | Input::ButtonHold))
+		static ActionPtr button(uint32_t button, Input::InputType mask = static_cast<Input::InputType>(Input::ButtonPressed | Input::ButtonHeld))
 		{
 			class ButtonAction : public Action
 			{
@@ -286,8 +286,8 @@ namespace raz
 					{
 					case IInputDevice::Pressed:
 						return Input::ButtonPressed;
-					case IInputDevice::Hold:
-						return Input::ButtonHold;
+					case IInputDevice::Held:
+						return Input::ButtonHeld;
 					case IInputDevice::Released:
 						return Input::ButtonReleased;
 					default:
@@ -347,6 +347,11 @@ namespace raz
 		void unbind(uint32_t action_id)
 		{
 			m_actions.erase(action_id);
+		}
+
+		ActionPtr& operator[](uint32_t action_id)
+		{
+			return m_actions[action_id];
 		}
 
 		template<class Device>
