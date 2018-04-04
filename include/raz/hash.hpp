@@ -35,4 +35,9 @@ namespace raz
 	{
 		return (str[0] == 0) ? h : hash(&str[1], h * 33 + str[0]);
 	}
+
+	inline constexpr uint32_t hash32(const char* str)
+	{
+		return static_cast<uint32_t>(hash(str));
+	}
 }
