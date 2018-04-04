@@ -23,6 +23,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <tuple>
@@ -106,7 +107,8 @@ namespace raz
 			Held
 		};
 
-		typedef Input::ChannelValue(*ChannelCharacteristics)(const Input::ChannelValue&);
+		// useful for deadzones
+		typedef std::function<Input::ChannelValue(const Input::ChannelValue&)> ChannelCharacteristics;
 
 		virtual uint32_t getID() const = 0;
 		virtual ButtonState getButtonState(uint32_t button) const = 0;
@@ -320,6 +322,27 @@ namespace raz
 			};
 
 			return std::make_shared<ChannelAction>(channel);
+		}
+
+		static ActionPtr custom(std::function<bool(const Input&)> fn)
+		{
+			class CustomAction : public Action
+			{
+			public:
+				CustomAction(std::function<bool(const Input&)> fn) : m_fn(fn)
+				{
+				}
+
+				virtual bool tryInput(const Input& input) const
+				{
+					return m_fn(input);
+				}
+
+			private:
+				std::function<bool(const Input&)> m_fn;
+			};
+
+			return std::make_shared<CustomAction>(fn);
 		}
 
 		virtual ~Action() = default;
