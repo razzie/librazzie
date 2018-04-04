@@ -47,7 +47,7 @@ int main()
 	raz::ActionMap<raz::Keyboard, raz::Mouse> action_map;
 	ActionHandler handler;
 
-	auto action = raz::Action::createButtonAction('a') || raz::Action::createButtonAction('b');
+	auto action = raz::Action::button<raz::Keyboard>('a') || raz::Action::button<raz::Keyboard>('b');
 	action_map.bind("ab"_action, action);
 
 	int input;

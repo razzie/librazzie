@@ -115,10 +115,12 @@ namespace raz
 		virtual void setChannelCharacteristics(uint32_t channel, ChannelCharacteristics) = 0;
 	};
 
-	template<uint32_t ButtonCount, uint32_t ChannelCount, uint32_t ID = 0>
+	template<uint32_t DeviceID, uint32_t ButtonCount, uint32_t ChannelCount>
 	class InputDevice : public IInputDevice
 	{
 	public:
+		enum : uint32_t { ID = DeviceID };
+
 		struct ButtonPressed
 		{
 			typedef InputDevice Device;
@@ -160,7 +162,7 @@ namespace raz
 
 		virtual uint32_t getID() const
 		{
-			return ID;
+			return DeviceID;
 		}
 
 		virtual ButtonState getButtonState(uint32_t button) const
@@ -235,10 +237,9 @@ namespace raz
 		std::array<ChannelCharacteristics, ChannelCount> m_channel_characteristics;
 	};
 
-	typedef InputDevice<256, 0> CharKeyboard;
-	typedef InputDevice<~0u, 0> Keyboard;
-	typedef InputDevice<3, 2> Mouse; // three buttons + one XY bundled channel and a mouse wheel one
-	template<uint32_t ID> using GamePad = typename InputDevice<12, 4, ID>;
+	typedef InputDevice<hash32("Keyboard"), ~0u, 0> Keyboard;
+	typedef InputDevice<hash32("Mouse"), 3, 2> Mouse; // three buttons + an XY bundled channel and a mouse wheel channel
+	template<uint32_t ID> using GamePad = typename InputDevice<ID, 12, 4>;
 
 
 	class Action;
@@ -247,7 +248,8 @@ namespace raz
 	class Action : public std::enable_shared_from_this<Action>
 	{
 	public:
-		static ActionPtr createButtonAction(uint32_t button, Input::InputType mask = static_cast<Input::InputType>(Input::ButtonPressed | Input::ButtonHold))
+		template<class Device>
+		static ActionPtr button(uint32_t button, Input::InputType mask = static_cast<Input::InputType>(Input::ButtonPressed | Input::ButtonHold))
 		{
 			class ButtonAction : public Action
 			{
@@ -259,7 +261,15 @@ namespace raz
 
 				virtual bool tryInput(const Input& input) const
 				{
-					return ((input.button == m_button) && (input.type & m_mask)) || tryDeviceInput(input.device);
+					if (input.device->getID() == Device::ID)
+					{
+						if ((input.button == m_button) && (input.type & m_mask))
+							return true;
+						else if (tryDeviceInput(input.device))
+							return true;
+					}
+
+					return false;
 				}
 
 			private:
@@ -293,7 +303,8 @@ namespace raz
 			return std::make_shared<ButtonAction>(button, mask);
 		}
 
-		static ActionPtr createChannelAction(uint32_t channel)
+		template<class Device>
+		static ActionPtr channel(uint32_t channel)
 		{
 			class ChannelAction : public Action
 			{
@@ -305,7 +316,7 @@ namespace raz
 
 				virtual bool tryInput(const Input& input) const
 				{
-					return (input.channel == m_channel);
+					return ((input.device->getID() == Device::ID) && (input.channel == m_channel));
 				}
 
 			private:
@@ -392,7 +403,7 @@ namespace raz
 	{
 		constexpr uint32_t operator"" _action(const char* action, size_t)
 		{
-			return (uint32_t)hash(action);
+			return hash32(action);
 		}
 	}
 }
