@@ -101,9 +101,9 @@ namespace raz
 	public:
 		enum ButtonState : unsigned
 		{
-			Released = (1 << 0),
-			Pressed =  (1 << 1),
-			Hold =     (1 << 2)
+			Released = 0,
+			Pressed,
+			Hold
 		};
 
 		typedef Input::ChannelValue(*ChannelCharacteristics)(const Input::ChannelValue&);
@@ -155,10 +155,6 @@ namespace raz
 			uint32_t channel;
 			Input::ChannelValue channel_value;
 		};
-
-		InputDevice()
-		{
-		}
 
 		virtual uint32_t getID() const
 		{
@@ -339,6 +335,10 @@ namespace raz
 	class ActionMap
 	{
 	public:
+		ActionMap() // need this to avoid VS2017 Intellisense bug
+		{
+		}
+
 		void bind(uint32_t action_id, ActionPtr action_ptr)
 		{
 			m_actions[action_id] = action_ptr;
