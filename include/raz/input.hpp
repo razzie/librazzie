@@ -436,7 +436,7 @@ namespace raz
 	}
 }
 
-raz::ActionPtr operator&&(raz::ActionPtr action1, raz::ActionPtr action2)
+inline raz::ActionPtr operator&&(raz::ActionPtr action1, raz::ActionPtr action2)
 {
 	class AndAction : public raz::Action
 	{
@@ -459,7 +459,7 @@ raz::ActionPtr operator&&(raz::ActionPtr action1, raz::ActionPtr action2)
 	return std::make_shared<AndAction>(action1, action2);
 }
 
-raz::ActionPtr operator||(raz::ActionPtr action1, raz::ActionPtr action2)
+inline raz::ActionPtr operator||(raz::ActionPtr action1, raz::ActionPtr action2)
 {
 	class OrAction : public raz::Action
 	{
@@ -482,7 +482,7 @@ raz::ActionPtr operator||(raz::ActionPtr action1, raz::ActionPtr action2)
 	return std::make_shared<OrAction>(action1, action2);
 }
 
-raz::ActionPtr operator!(raz::ActionPtr action)
+inline raz::ActionPtr operator!(raz::ActionPtr action)
 {
 	class NotAction : public raz::Action
 	{
