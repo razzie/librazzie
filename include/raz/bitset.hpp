@@ -300,6 +300,12 @@ namespace raz
 			std::memcpy(m_data, other.m_data, sizeof(m_data));
 		}
 
+		Bitset& operator=(const Bitset& other)
+		{
+			std::memcpy(m_data, other.m_data, sizeof(m_data));
+			return *this;
+		}
+
 		bool isset(size_t pos) const
 		{
 			if (pos >= N)
