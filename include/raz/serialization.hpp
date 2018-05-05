@@ -50,7 +50,7 @@ namespace raz
 	{
 	public:
 		template<class... Args>
-		Serializer(Args... args) : BufferType(std::forward<Args>(args)...)
+		Serializer(Args&&... args) : BufferType(std::forward<Args>(args)...)
 		{
 		}
 

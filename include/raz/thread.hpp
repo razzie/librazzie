@@ -63,7 +63,7 @@ namespace raz
 		}
 
 		template<class... Args>
-		std::future<void> start(Args... args)
+		std::future<void> start(Args&&... args)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -97,7 +97,7 @@ namespace raz
 		}
 
 		template<class... Args>
-		void operator()(Args... args)
+		void operator()(Args&&... args)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 			m_call_queue.emplace_back(std::allocator_arg, raz::Allocator<char>(m_memory), [args...](T& object) { object(args...); });
@@ -132,27 +132,27 @@ namespace raz
 			static constexpr bool has_parenthesis_op = decltype(test<T>(true))::value;
 
 			template<bool value>
-			static std::enable_if_t<value, bool> _call(T& object, Args... args)
+			static std::enable_if_t<value, bool> _call(T& object, Args&&... args)
 			{
 				object(std::forward<Args>(args)...);
 				return true;
 			}
 
 			template<int value>
-			static std::enable_if_t<!value, bool> _call(T& object, Args... args)
+			static std::enable_if_t<!value, bool> _call(T& object, Args&&... args)
 			{
 				return false;
 			}
 
 		public:
-			static bool call(T& object, Args... args)
+			static bool call(T& object, Args&&... args)
 			{
 				return _call<has_parenthesis_op>(object, std::forward<Args>(args)...);
 			}
 		};
 
 		template<class... Args>
-		void run(Args... args)
+		void run(Args&&... args)
 		{
 			try
 			{
@@ -264,9 +264,9 @@ namespace raz
 		TaskManager& operator=(const TaskManager&) = delete;
 
 		template<class R, class C, class... fnArgs, class... Args>
-		static std::shared_future<R> pack(std::shared_ptr<C> obj, R(C::*fn)(fnArgs...), Args... args)
+		static std::shared_future<R> pack(std::shared_ptr<C> obj, R(C::*fn)(fnArgs...), Args&&... args)
 		{
-			auto converted_fn = [](std::shared_ptr<C> obj, R(C::*fn)(fnArgs...), Args... args)->R
+			auto converted_fn = [](std::shared_ptr<C> obj, R(C::*fn)(fnArgs...), Args&&... args)->R
 			{
 				return obj->*fn(std::forward<Args>(args)...);
 			};
@@ -275,9 +275,9 @@ namespace raz
 		}
 
 		template<class C, class... Args>
-		static auto pack(std::shared_ptr<C> obj, Args... args) -> std::shared_future<decltype(obj->operator()(args...))>
+		static auto pack(std::shared_ptr<C> obj, Args&&... args) -> std::shared_future<decltype(obj->operator()(args...))>
 		{
-			auto converted_fn = [](std::shared_ptr<C> obj, Args... args)
+			auto converted_fn = [](std::shared_ptr<C> obj, Args&&... args)
 			{
 				return obj->operator()(std::forward<Args>(args)...);
 			};
@@ -286,13 +286,13 @@ namespace raz
 		}
 
 		template<class F, class... Args>
-		static auto pack(F fn, Args... args) -> std::shared_future<decltype(fn(args...))>
+		static auto pack(F fn, Args&&... args) -> std::shared_future<decltype(fn(args...))>
 		{
 			return std::async(std::launch::deferred, fn, std::forward<Args>(args)...);
 		}
 
 		template<class R, class C, class... fnArgs, class... Args>
-		std::shared_future<R> operator()(std::shared_ptr<C> obj, R(C::*fn)(fnArgs...), Args... args)
+		std::shared_future<R> operator()(std::shared_ptr<C> obj, R(C::*fn)(fnArgs...), Args&&... args)
 		{
 			auto result = pack(obj, fn, std::forward<Args>(args)...);
 
@@ -303,7 +303,7 @@ namespace raz
 		}
 
 		template<class C, class... Args>
-		auto operator()(std::shared_ptr<C> obj, Args... args) -> std::shared_future<decltype(obj->operator()(args...))>
+		auto operator()(std::shared_ptr<C> obj, Args&&... args) -> std::shared_future<decltype(obj->operator()(args...))>
 		{
 			auto result = pack(obj, std::forward<Args>(args)...);
 
@@ -314,7 +314,7 @@ namespace raz
 		}
 
 		template<class F, class... Args>
-		auto operator()(F fn, Args... args) -> std::shared_future<decltype(fn(args...))>
+		auto operator()(F fn, Args&&... args) -> std::shared_future<decltype(fn(args...))>
 		{
 			auto result = pack(fn, std::forward<Args>(args)...);
 

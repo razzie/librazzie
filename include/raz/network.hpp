@@ -158,7 +158,7 @@ namespace raz
 	{
 	public:
 		template<class... Args>
-		NetworkClient(Args... args) : m_backend(std::forward<Args>(args)...)
+		NetworkClient(Args&&... args) : m_backend(std::forward<Args>(args)...)
 		{
 		}
 
@@ -234,7 +234,7 @@ namespace raz
 		};
 
 		template<class... Args>
-		NetworkServer(Args... args) : m_backend(std::forward<Args>(args)...)
+		NetworkServer(Args&&... args) : m_backend(std::forward<Args>(args)...)
 		{
 		}
 

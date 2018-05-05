@@ -37,7 +37,7 @@ namespace raz
 		virtual size_t getUsedMemory() const = 0;
 
 		template<class T, class... Args>
-		T* create(Args... args)
+		T* create(Args&&... args)
 		{
 			raz::Allocator<T> alloc(this);
 			T* t = std::allocator_traits<raz::Allocator<T>>::allocate(alloc, 1);
