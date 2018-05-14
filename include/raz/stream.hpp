@@ -30,6 +30,78 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 namespace raz
 {
+	template<class T>
+	class HasStreamInserter
+	{
+		template<class U>
+		static constexpr auto test() -> decltype(bool(std::declval<std::ostream&>() << std::declval<const U&>()))
+		{
+			return true;
+		}
+
+		template<class U>
+		static constexpr bool test(...)
+		{
+			return false;
+		}
+
+	public:
+		constexpr static bool value = test<T>();
+	};
+
+	template<class T>
+	class HasStreamExtractor
+	{
+		template<class U>
+		static constexpr auto test() -> decltype(bool(std::declval<std::ostream&>() >> std::declval<U&>()))
+		{
+			return true;
+		}
+
+		template<class U>
+		static constexpr bool test(...)
+		{
+			return false;
+		}
+
+	public:
+		constexpr static bool value = test<T>();
+	};
+
+	struct __FallbackType
+	{
+		template<class T>
+		__FallbackType(const T&) : type(&typeid(T))
+		{
+		}
+
+		friend std::ostream& operator<< (std::ostream& os, const __FallbackType& t)
+		{
+			os << t.type->name();
+			return os;
+		}
+
+		friend std::istream& operator>> (std::istream& is, __FallbackType&)
+		{
+			return is;
+		}
+
+		const std::type_info* type;
+	};
+
+	template<class T>
+	std::conditional_t<HasStreamInserter<T>::value, const T&, __FallbackType> insert(const T& t)
+	{
+		return { t };
+	}
+
+	template<class T>
+	std::conditional_t<HasStreamExtractor<T>::value, T&, __FallbackType> extract(T& t)
+	{
+		return { t };
+	}
+
+
 	template<class To, class From>
 	To lexical_cast(const From& from)
 	{
@@ -331,171 +403,5 @@ namespace raz
 		std::stringstream ss(str);
 		if (d) ss << delimiter(*d);
 		return parse<Params...>(ss);
-	}
-
-
-	namespace __fallback
-	{
-		struct Dummy {};
-
-		template<class T>
-		Dummy operator<< (std::ostream&, const T&);
-
-		template<class T>
-		Dummy operator>> (std::istream&, T&);
-	}
-
-	template<class T>
-	class HasStreamInserter
-	{
-		static std::true_type  test(std::ostream&);
-		static std::false_type test(...);
-
-		static std::ostream &s;
-		static std::remove_reference_t<T>& t;
-
-		static constexpr bool check()
-		{
-			using namespace __fallback;
-			return decltype(test(s << t))::value;
-		}
-
-	public:
-		static bool const value = check();
-	};
-
-	template<class T>
-	class HasStreamExtractor
-	{
-		static std::true_type  test(std::istream&);
-		static std::false_type test(...);
-
-		static std::istream &s;
-		static std::remove_reference_t<T>& t;
-
-		static constexpr bool check()
-		{
-			using namespace __fallback;
-			return decltype(test(s >> t))::value;
-		}
-
-	public:
-		static const bool value = check();
-	};
-
-
-	template<class T>
-	class StreamInsert
-	{
-		template<class U, bool>
-		struct Insert
-		{
-			static std::ostream& apply(std::ostream& s, const U& value)
-			{
-				s << value;
-				return s;
-			}
-		};
-
-		template<class U>
-		struct Insert<U, false>
-		{
-			static std::ostream& apply(std::ostream& s, const U& value)
-			{
-				s << typeid(T).name();
-				return s;
-			}
-		};
-
-	public:
-		static std::ostream& apply(std::ostream& s, const T& value)
-		{
-			return Insert<T, HasStreamInserter<T>::value>::apply(s, value);
-		}
-
-		class Wrapper
-		{
-		public:
-			Wrapper(const T& value) : m_value(value)
-			{
-			}
-
-			friend std::ostream& operator<< (std::ostream& s, const Wrapper& w)
-			{
-				return apply(s, w.m_value);
-			}
-
-		private:
-			const T& m_value;
-		};
-	};
-
-	template<class T>
-	typename StreamInsert<T>::Wrapper insert(const T& value)
-	{
-		return typename StreamInsert<T>::Wrapper(value);
-	}
-
-
-	template<class T>
-	class StreamExtract
-	{
-		template<class U, bool>
-		struct Extract
-		{
-			static std::istream& apply(std::istream& s, U& value)
-			{
-				s >> value;
-				return s;
-			}
-		};
-
-		// special case for std::string
-		template<>
-		struct Extract<std::string, true>
-		{
-			static std::istream& apply(std::istream& s, std::string& value)
-			{
-				std::getline(s, value);
-				return s;
-			}
-		};
-
-		template<class U>
-		struct Extract<U, false>
-		{
-			static std::istream& apply(std::istream& s, U& value)
-			{
-				return s;
-			}
-		};
-
-	public:
-		static std::istream& apply(std::istream& s, T& value)
-		{
-			return Extract<T, HasStreamExtractor<T>::value>::apply(s, value);
-		}
-
-		class Wrapper
-		{
-		public:
-			Wrapper(T& value) : m_value(value)
-			{
-			}
-
-			friend std::istream& operator>> (std::istream& s, Wrapper& w)
-			{
-				return apply(s, w.m_value);
-			}
-
-		private:
-			T& m_value;
-		};
-	};
-
-	template<class T>
-	typename StreamExtract<T>::Wrapper extract(T& value)
-	{
-		return typename StreamExtract<T>::Wrapper(value);
 	}
 };
