@@ -71,13 +71,13 @@ namespace raz
 	struct __FallbackType
 	{
 		template<class T>
-		__FallbackType(const T&) : type(&typeid(T))
+		__FallbackType(const T&) : type(typeid(T))
 		{
 		}
 
 		friend std::ostream& operator<< (std::ostream& os, const __FallbackType& t)
 		{
-			os << t.type->name();
+			os << t.type.name();
 			return os;
 		}
 
@@ -86,7 +86,22 @@ namespace raz
 			return is;
 		}
 
-		const std::type_info* type;
+		const std::type_info& type;
+	};
+
+	struct __StringFallbackType
+	{
+		__StringFallbackType(std::string& _str) : str(_str)
+		{
+		}
+
+		friend std::istream& operator>> (std::istream& is, __StringFallbackType& str)
+		{
+			std::getline(is, str.str);
+			return is;
+		}
+
+		std::string& str;
 	};
 
 	template<class T>
@@ -99,6 +114,11 @@ namespace raz
 	std::conditional_t<HasStreamExtractor<T>::value, T&, __FallbackType> extract(T& t)
 	{
 		return { t };
+	}
+
+	__StringFallbackType extract(std::string& str)
+	{
+		return { str };
 	}
 
 
