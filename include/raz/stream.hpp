@@ -23,12 +23,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #include <iosfwd>
 #include <locale>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 
 namespace raz
 {
+	template<class To, class From>
+	To lexical_cast(const From& from)
+	{
+		To to;
+		std::sstream ss;
+		ss << from;
+		ss >> to;
+		return to;
+	}
+
+
 	template<class T>
 	class StreamManipulator
 	{
