@@ -162,6 +162,9 @@ namespace raz
 		{
 		}
 
+		NetworkClient(const NetworkClient&) = delete;
+		NetworkClient& operator=(const NetworkClient&) = delete;
+
 		template<class Packet>
 		bool receive(Packet& packet, uint32_t timeous_ms = 0)
 		{
@@ -238,6 +241,9 @@ namespace raz
 		{
 		}
 
+		NetworkServer(const NetworkServer&) = delete;
+		NetworkServer& operator=(const NetworkServer&) = delete;
+
 		template<class ClientData>
 		bool receive(ClientData& data, uint32_t timeous_ms = 0)
 		{
@@ -298,11 +304,11 @@ namespace raz
 	// include raz/networkbackend.hpp for definitions
 	class NetworkClientBackendTCP;
 	class NetworkServerBackendTCP;
-	template<size_t> class NetworkClientBackendUDP;
-	template<size_t> class NetworkServerBackendUDP;
+	class NetworkClientBackendUDP;
+	class NetworkServerBackendUDP;
 
 	typedef NetworkClient<raz::NetworkClientBackendTCP> NetworkClientTCP;
 	typedef NetworkServer<raz::NetworkServerBackendTCP> NetworkServerTCP;
-	template<size_t SIZE = 2048> using NetworkClientUDP = typename NetworkClient<raz::NetworkClientBackendUDP<SIZE>>;
-	template<size_t SIZE = 2048> using NetworkServerUDP = typename NetworkServer<raz::NetworkServerBackendUDP<SIZE>>;
+	typedef NetworkClient<raz::NetworkClientBackendUDP> NetworkClientUDP;
+	typedef NetworkServer<raz::NetworkServerBackendUDP> NetworkServerUDP;
 }

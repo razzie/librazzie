@@ -137,8 +137,8 @@ int main()
 	}
 	else if (protocol == 2)
 	{
-		std::thread t(runServer<raz::NetworkServerUDP<512>>, port, server_exit_token.get_future());
-		runClient<raz::NetworkClientUDP<512>>(port);
+		std::thread t(runServer<raz::NetworkServerUDP>, port, server_exit_token.get_future());
+		runClient<raz::NetworkClientUDP>(port);
 		server_exit_token.set_value();
 		t.join();
 	}
