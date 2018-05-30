@@ -21,10 +21,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #pragma once
 
+#ifdef _WIN32
 #pragma warning (disable : 4250)
 #pragma comment(lib, "ws2_32.lib")
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#endif
 
 #include <cstdint>
 #include <cstring>
@@ -57,13 +62,17 @@ namespace raz
 	public:
 		NetworkInitializer()
 		{
+#ifdef _WIN32
 			WSADATA wsaData;
 			WSAStartup(MAKEWORD(2, 2), &wsaData);
+#endif
 		}
 
 		~NetworkInitializer()
 		{
+#ifdef _WIN32
 			WSACleanup();
+#endif
 		}
 
 		NetworkInitializer(const NetworkInitializer&) = delete;
@@ -476,29 +485,41 @@ namespace raz
 	 * UDP CLIENT AND SERVER BACKENDS
 	 */
 
-	template<size_t BUF_SIZE = 2048>
 	class NetworkClientBackendUDP
 	{
 	public:
 		NetworkClientBackendUDP() :
 			m_socket(INVALID_SOCKET),
 			m_data_len(0),
-			m_data_pos(0)
+			m_data_pos(0),
+			m_data(m_buffer),
+			m_buffer_len(sizeof(m_buffer))
 		{
 		}
 
-		NetworkClientBackendUDP(const char* host, uint16_t port, bool ipv6 = false) :
+		NetworkClientBackendUDP(const char* host, uint16_t port, bool ipv6 = false, size_t buffer_len = INTERNAL_BUFFER_LENGTH) :
 			m_socket(INVALID_SOCKET),
 			m_data_len(0),
-			m_data_pos(0)
+			m_data_pos(0),
+			m_data(buffer_len > sizeof(m_buffer) ? nullptr : m_buffer),
+			m_buffer_len(buffer_len)
 		{
 			if (!open(host, port, ipv6))
 				throw NetworkConnectionError();
+
+			if (m_data == nullptr)
+				m_data = new char[m_buffer_len];
 		}
+
+		NetworkClientBackendUDP(const NetworkClientBackendUDP&) = delete;
+		NetworkClientBackendUDP& operator=(const NetworkClientBackendUDP&) = delete;
 
 		~NetworkClientBackendUDP()
 		{
 			close();
+
+			if (m_data != m_buffer)
+				delete[] m_data;
 		}
 
 		bool open(const char* host, uint16_t port, bool ipv6 = false)
@@ -570,7 +591,7 @@ namespace raz
 			}
 			else if (rc > 0)
 			{
-				m_data_len = recv(m_socket, m_data, BUF_SIZE, 0);
+				m_data_len = recv(m_socket, m_data, m_buffer_len, 0);
 				m_data_pos = 0;
 				return m_data_len;
 			}
@@ -624,15 +645,18 @@ namespace raz
 			m_socket = INVALID_SOCKET;
 		}
 
+		enum : size_t { INTERNAL_BUFFER_LENGTH = 2048 };
+
 	private:
 		SOCKET m_socket;
 		SOCKADDR_STORAGE m_sockaddr;
 		size_t m_data_len;
 		size_t m_data_pos;
-		char m_data[BUF_SIZE];
+		char* m_data;
+		char m_buffer[INTERNAL_BUFFER_LENGTH];
+		size_t m_buffer_len;
 	};
 
-	template<size_t BUF_SIZE = 2048>
 	class NetworkServerBackendUDP
 	{
 	public:
@@ -656,22 +680,35 @@ namespace raz
 		NetworkServerBackendUDP() :
 			m_socket(INVALID_SOCKET),
 			m_data_len(0),
-			m_data_pos(0)
+			m_data_pos(0),
+			m_data(m_buffer),
+			m_buffer_len(sizeof(m_buffer))
 		{
 		}
 
-		NetworkServerBackendUDP(uint16_t port, bool ipv6 = false) :
+		NetworkServerBackendUDP(uint16_t port, bool ipv6 = false, size_t buffer_len = INTERNAL_BUFFER_LENGTH) :
 			m_socket(INVALID_SOCKET),
 			m_data_len(0),
-			m_data_pos(0)
+			m_data_pos(0),
+			m_data(buffer_len > sizeof(m_buffer) ? nullptr : m_buffer),
+			m_buffer_len(buffer_len)
 		{
 			if (!open(port, ipv6))
 				throw NetworkConnectionError();
+
+			if (m_data == nullptr)
+				m_data = new char[m_buffer_len];
 		}
+
+		NetworkServerBackendUDP(const NetworkServerBackendUDP&) = delete;
+		NetworkServerBackendUDP& operator=(const NetworkServerBackendUDP&) = delete;
 
 		~NetworkServerBackendUDP()
 		{
 			close();
+
+			if (m_data != m_buffer)
+				delete[] m_data;
 		}
 
 		bool open(uint16_t port, bool ipv6 = false)
@@ -753,7 +790,7 @@ namespace raz
 			else if (rc > 0)
 			{
 				int addrlen = sizeof(client.sockaddr);
-				int rc = recvfrom(m_socket, m_data, BUF_SIZE, 0, reinterpret_cast<struct sockaddr*>(&client.sockaddr), &addrlen);
+				int rc = recvfrom(m_socket, m_data, m_buffer_len, 0, reinterpret_cast<struct sockaddr*>(&client.sockaddr), &addrlen);
 				if (rc == SOCKET_ERROR)
 				{
 					state = ClientState::CLIENT_UNAVAILABLE;
@@ -826,12 +863,16 @@ namespace raz
 			m_socket = INVALID_SOCKET;
 		}
 
+		enum : size_t { INTERNAL_BUFFER_LENGTH = 2048 };
+
 	private:
 		SOCKET m_socket;
 		SOCKADDR_STORAGE m_sockaddr;
 		Client m_last_client;
 		size_t m_data_len;
 		size_t m_data_pos;
-		char m_data[BUF_SIZE];
+		char* m_data;
+		char m_buffer[INTERNAL_BUFFER_LENGTH];
+		size_t m_buffer_len;
 	};
 }
