@@ -45,12 +45,12 @@ namespace raz
 			m_commands.emplace(cmd, func);
 		}
 
-		void operator()(int argc, CharT** argv)
+		void operator()(int argc, CharT** argv) const
 		{
 			parse(argv, argv + argc);
 		}
 
-		void operator()(Stream& stream)
+		void operator()(Stream& stream) const
 		{
 			parse(StreamIterator(stream), StreamIterator());
 		}
@@ -73,7 +73,7 @@ namespace raz
 			}
 
 			template<class Iter>
-			void exec(Iter& it, Iter end)
+			void exec(Iter& it, Iter end) const
 			{
 				m_func(getCmdArgs(it, end));
 			}
@@ -171,7 +171,7 @@ namespace raz
 		std::map<String, Cmd> m_commands;
 
 		template<class Iter>
-		void parse(Iter begin, Iter end)
+		void parse(Iter begin, Iter end) const
 		{
 			for (auto it = begin; it != end; )
 			{
