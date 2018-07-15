@@ -126,7 +126,7 @@ namespace raz
 	To lexical_cast(const From& from)
 	{
 		To to;
-		std::sstream ss;
+		std::stringstream ss;
 		ss << from;
 		ss >> to;
 		return to;
