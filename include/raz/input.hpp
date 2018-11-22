@@ -38,7 +38,7 @@ namespace raz
 	{
 		enum InputType : unsigned
 		{
-			Unknown =        (1 << 0),
+			NoInput =        (1 << 0),
 			ButtonPressed =  (1 << 1),
 			ButtonHeld =     (1 << 2),
 			ButtonReleased = (1 << 3),
@@ -79,7 +79,7 @@ namespace raz
 		};
 
 		Input() :
-			type(InputType::Unknown), action(0),
+			type(InputType::NoInput), action(0),
 			button(0),
 			channel(0), channel_value(0.f), channel_delta(0.f),
 			device(nullptr),
@@ -122,6 +122,11 @@ namespace raz
 	{
 	public:
 		enum : uint32_t { ID = DeviceID };
+
+		struct NoInput
+		{
+			typedef InputDevice Device;
+		};
 
 		struct ButtonPressed
 		{
@@ -182,6 +187,13 @@ namespace raz
 		virtual void setChannelCharacteristics(uint32_t channel, ChannelCharacteristics fn)
 		{
 			m_channel_characteristics[channel] = fn;
+		}
+
+		Input operator()(NoInput event)
+		{
+			Input input;
+			input.device = this;
+			return input;
 		}
 
 		Input operator()(ButtonPressed event)
@@ -293,7 +305,7 @@ namespace raz
 					case IInputDevice::Released:
 						return Input::ButtonReleased;
 					default:
-						return Input::Unknown;
+						return Input::NoInput;
 					}
 				}
 			};
