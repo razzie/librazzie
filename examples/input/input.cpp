@@ -55,6 +55,7 @@ int main()
 	{
 		input = _getch();
 		action_map(raz::Keyboard::ButtonPressed(input), handler);
+		action_map(raz::Keyboard::ButtonReleased(input), handler);
 
 	} while (input != '\r');
 
