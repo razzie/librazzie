@@ -23,6 +23,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 #include <tuple>
@@ -174,6 +175,32 @@ namespace raz
 
 				for (auto& t : vec)
 					(*this)(t);
+			}
+
+			return *this;
+		}
+
+		template<class KT, class T, class Comp, class Allocator>
+		Serializer& operator()(std::map<KT, T, Comp, Allocator>& map)
+		{
+			if (BufferType::getMode() == SerializationMode::SERIALIZE)
+			{
+				uint32_t len = static_cast<uint32_t>(map.size());
+				(*this)(len);
+
+				for (auto& t : map)
+					(*this)(t.first)(t.second);
+			}
+			else
+			{
+				uint32_t len;
+				(*this)(len);
+
+				for (size_t i = 0; i < len; ++i)
+				{
+					KT key;
+					(*this)(key)(map[key]);
+				}
 			}
 
 			return *this;
