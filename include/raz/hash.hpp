@@ -40,4 +40,20 @@ namespace raz
 	{
 		return static_cast<uint32_t>(hash(str));
 	}
+
+	template<class T>
+	inline constexpr uint64_t hash()
+	{
+#ifdef _MSC_VER
+		return raz::hash(__FUNCSIG__);
+#else
+		return raz::hash(__PRETTY_FUNCTION__);
+#endif
+	}
+
+	template<class T>
+	inline constexpr uint32_t hash32()
+	{
+		return static_cast<uint32_t>(hash<T>());
+	}
 }
