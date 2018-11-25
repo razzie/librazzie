@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 #include <vector>
 #include <tuple>
 #include <type_traits>
+#include "raz/hash.hpp"
 
 namespace raz
 {
@@ -350,4 +351,44 @@ namespace raz
 
 	template<class Serializer, class T = void>
 	using EnableSerializer = std::enable_if_t<IsSerializer<Serializer>::value, T>;
+
+	template<class T, class... Ts>
+	class DeserializerHelper
+	{
+	public:
+		virtual void handle(T&&) = 0;
+	};
+
+	template<class T, class... Ts>
+	class Deserializer : public DeserializerHelper<T>, public DeserializerHelper<Ts>...
+	{
+	public:
+		template<class Serializer>
+		bool operator()(uint32_t type_hash /* from raz::hash32<TYPE>() */, Serializer& serializer)
+		{
+			return tryDeserialize<Serializer, T, Ts...>(type_hash, serializer);
+		}
+
+	private:
+		template<class Serializer, class U, class... Us>
+		bool tryDeserialize(uint32_t type_hash, Serializer& serializer)
+		{
+			if (type_hash == raz::hash32<U>())
+			{
+				U obj;
+				serializer.setMode(raz::SerializationMode::DESERIALIZE);
+				serializer(obj);
+				this->handle(std::move(obj));
+				return true;
+			}
+
+			return tryDeserialize<Serializer, Us...>(type_hash, serializer);
+		}
+
+		template<class Serializer>
+		bool tryDeserialize(uint32_t, Serializer&)
+		{
+			return false;
+		}
+	};
 }
