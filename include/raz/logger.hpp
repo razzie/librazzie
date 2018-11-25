@@ -21,12 +21,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
+#include <string>
+#include <sstream>
 
 namespace raz
 {
@@ -48,20 +51,29 @@ namespace raz
 		}
 
 		template<class... Args>
-		void operator()(const Args&... args)
+		void operator()(std::string format, const Args&... args)
 		{
-			operator()(m_default_output, args...);
+			operator()(m_default_output, format, args...);
 		}
 
 		template<class... Args>
-		void operator()(Output output, const Args&... args)
+		void operator()(Output output, std::string format, const Args&... args)
 		{
+			std::array<std::string, sizeof...(Args)> str_args{ toString(args)... };
+
 			std::lock_guard<std::mutex> guard(m_mutex);
 
+			int curr_arg = 0;
 			std::ostream& out = *getOutput(output);
 
 			printTimeStamp(out);
-			int expand[sizeof...(Args)] = { (out << args, 0)... };
+			for (char c : format)
+			{
+				if (c == '%')
+					out << str_args[curr_arg++];
+				else
+					out << c;
+			}
 			out << std::endl;
 		}
 
@@ -123,6 +135,14 @@ namespace raz
 
 			std::strftime(filename, sizeof(filename), "log_%Y%m%d_%H%M%S.txt", &time_info);
 			m_logfile.open(filename, std::ios_base::out);
+		}
+
+		template<class T>
+		static std::string toString(const T& t)
+		{
+			std::stringstream ss;
+			ss << t;
+			return ss.str();
 		}
 	};
 }
