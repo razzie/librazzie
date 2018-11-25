@@ -70,7 +70,7 @@ namespace raz
 			for (char c : format)
 			{
 				if (c == '%')
-					out << str_args[curr_arg++];
+					out << str_args.at(curr_arg++);
 				else
 					out << c;
 			}
@@ -137,8 +137,13 @@ namespace raz
 			m_logfile.open(filename, std::ios_base::out);
 		}
 
+		static inline std::string toString(std::string str)
+		{
+			return str;
+		}
+
 		template<class T>
-		static std::string toString(const T& t)
+		static inline std::string toString(const T& t)
 		{
 			std::stringstream ss;
 			ss << t;
