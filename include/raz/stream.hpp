@@ -68,20 +68,20 @@ namespace raz
 		constexpr static bool value = test<T>();
 	};
 
-	struct __FallbackType
+	struct __StreamFallbackType
 	{
 		template<class T>
-		__FallbackType(const T&) : type(typeid(T))
+		__StreamFallbackType(const T&) : type(typeid(T))
 		{
 		}
 
-		friend std::ostream& operator<< (std::ostream& os, const __FallbackType& t)
+		friend std::ostream& operator<< (std::ostream& os, const __StreamFallbackType& t)
 		{
 			os << t.type.name();
 			return os;
 		}
 
-		friend std::istream& operator>> (std::istream& is, __FallbackType&)
+		friend std::istream& operator>> (std::istream& is, __StreamFallbackType&)
 		{
 			return is;
 		}
@@ -105,13 +105,13 @@ namespace raz
 	};
 
 	template<class T>
-	std::conditional_t<HasStreamInserter<T>::value, const T&, __FallbackType> insert(const T& t)
+	auto insert(const T& t) -> std::conditional_t<HasStreamInserter<T>::value, const T&, __StreamFallbackType>
 	{
 		return { t };
 	}
 
 	template<class T>
-	std::conditional_t<HasStreamExtractor<T>::value, T&, __FallbackType> extract(T& t)
+	auto extract(T& t) -> std::conditional_t<HasStreamExtractor<T>::value, T&, __StreamFallbackType>
 	{
 		return { t };
 	}
@@ -123,13 +123,27 @@ namespace raz
 
 
 	template<class To, class From>
-	To lexical_cast(const From& from)
+	auto lexical_cast(const From& from) -> std::enable_if_t<!std::is_same_v<To, std::string>, To>
 	{
 		To to;
 		std::stringstream ss;
 		ss << from;
 		ss >> to;
 		return to;
+	}
+
+	template<class To, class From>
+	auto lexical_cast(const From& from) -> std::enable_if_t<std::is_same_v<To, std::string>, To>
+	{
+		std::stringstream ss;
+		ss << from;
+		return ss.str();
+	}
+
+	template<class To, class... From>
+	std::array<To, sizeof...(From)> lexical_cast(const From&... from)
+	{
+		return { lexical_cast<To, From>(from)... };
 	}
 
 
