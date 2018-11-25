@@ -71,15 +71,15 @@ private:
 	size_t m_data_pos;
 };
 
-enum Bar
-{
-	BAR1 = 1,
-	BAR2 = 2,
-	BAR3 = 3
-};
-
 struct Foo
 {
+	enum Bar
+	{
+		BAR1 = 1,
+		BAR2 = 2,
+		BAR3 = 3
+	};
+
 	std::string str;
 	std::tuple<int, float> tup;
 	Bar bar;
@@ -97,10 +97,18 @@ struct Foo
 	}
 };
 
-int main()
+struct FooDeserializer : public raz::Deserializer<Foo>
+{
+	void handle(Foo&& foo)
+	{
+		std::cout << foo << std::endl;
+	}
+};
+
+void example01()
 {
 	raz::Serializer<Buffer<1024>> serializer;
-	Foo foo_src = { "razzie", std::make_tuple( 100, 1.5f ), Bar::BAR1 };
+	Foo foo_src { "razzie", std::make_tuple( 100, 1.5f ), Foo::Bar::BAR1 };
 	Foo foo_dest;
 
 	serializer.setMode(raz::SerializationMode::SERIALIZE);
@@ -110,6 +118,24 @@ int main()
 	serializer(foo_dest);
 
 	std::cout << foo_dest << std::endl;
+}
+
+void example02()
+{
+	raz::Serializer<Buffer<1024>> serializer;
+	Foo foo{ "razzie", std::make_tuple(100, 1.5f), Foo::Bar::BAR1 };
+
+	serializer.setMode(raz::SerializationMode::SERIALIZE);
+	serializer(foo);
+
+	FooDeserializer defoo;
+	defoo(raz::hash32<Foo>(), serializer);
+}
+
+int main()
+{
+	example01();
+	example02();
 
 	return 0;
 }

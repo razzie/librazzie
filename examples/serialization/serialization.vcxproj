@@ -124,6 +124,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\raz\hash.hpp" />
     <ClInclude Include="..\..\include\raz\serialization.hpp" />
   </ItemGroup>
   <ItemGroup>
