@@ -25,8 +25,8 @@ int main()
 {
 	raz::Logger log;
 
-	log("1 + 1 = ", 1 + 1);
-	log(raz::Logger::StdOut, "2 + 2 = ", 2 + 2);
+	log("1 + 1 = %", 1 + 1);
+	log(raz::Logger::StdOut, "The result of % + % is %", 2, 2, 2 + 2);
 
 	return 0;
 }
