@@ -99,7 +99,7 @@ struct Foo
 
 struct FooDeserializer : public raz::Deserializer<Foo>
 {
-	void handle(Foo&& foo)
+	void handle(Foo&& foo) override
 	{
 		std::cout << foo << std::endl;
 	}
