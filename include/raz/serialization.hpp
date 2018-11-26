@@ -378,7 +378,7 @@ namespace raz
 				U obj;
 				serializer.setMode(raz::SerializationMode::DESERIALIZE);
 				serializer(obj);
-				this->handle(std::move(obj));
+				static_cast<DeserializerHelper<U>*>(this)->handle(std::move(obj));
 				return true;
 			}
 
