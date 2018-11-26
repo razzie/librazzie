@@ -357,6 +357,7 @@ namespace raz
 	{
 	public:
 		virtual void handle(T&&) = 0;
+		virtual uint32_t getTypeHash() const { return raz::hash32<T>(); }
 	};
 
 	template<class T, class... Ts>
@@ -364,8 +365,9 @@ namespace raz
 	{
 	public:
 		template<class Serializer>
-		bool operator()(uint32_t type_hash /* from raz::hash32<TYPE>() */, Serializer& serializer)
+		bool operator()(uint32_t type_hash, Serializer& serializer)
 		{
+			serializer.setMode(raz::SerializationMode::DESERIALIZE);
 			return tryDeserialize<Serializer, T, Ts...>(type_hash, serializer);
 		}
 
@@ -373,12 +375,13 @@ namespace raz
 		template<class Serializer, class U, class... Us>
 		bool tryDeserialize(uint32_t type_hash, Serializer& serializer)
 		{
-			if (type_hash == raz::hash32<U>())
+			auto handler = static_cast<DeserializerHelper<U>*>(this);
+
+			if (type_hash == handler->getTypeHash())
 			{
 				U obj;
-				serializer.setMode(raz::SerializationMode::DESERIALIZE);
 				serializer(obj);
-				static_cast<DeserializerHelper<U>*>(this)->handle(std::move(obj));
+				handler->handle(std::move(obj));
 				return true;
 			}
 
